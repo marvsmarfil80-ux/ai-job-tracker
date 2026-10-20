@@ -1,0 +1,24 @@
+services:
+  jobtracker-postgres:
+    image: postgres:16
+    container_name: jobtracker-postgres
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - jobtracker_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - n8n_default
+
+volumes:
+  jobtracker_pgdata:
+
+networks:
+  n8n_default:
+    external: true

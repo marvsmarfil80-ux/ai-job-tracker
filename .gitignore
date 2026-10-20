@@ -1,0 +1,30 @@
+# Secrets
+.env
+*.env
+groq.env
+*token*
+*.pem
+*.key
+
+# Local-only helper scripts
+setup-groq.sh
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Backups and archives
+backups/
+*.bak
+*.tar.gz
+
+# Logs
+*.log
+
+# Database data folders
+pgdata/
+postgres_data/
