@@ -25,8 +25,15 @@ A personal web app that automatically searches for remote jobs, tracks job appli
 
 ## Configuration
 
-Copy `.env.example` to `.env` and replace the placeholder values:
+Copy both example files and replace the placeholder values:
 
     cp .env.example .env
+    cp groq.env.example groq.env
+    chmod 600 .env groq.env
+
+- `.env` holds PostgreSQL settings only. Docker Compose passes this whole file to the database container.
+- `groq.env` holds the Groq API key. It is never passed to a container.
+
+Both files are git-ignored. Never commit real credentials.
 
 Setup and usage instructions will be added as the backend is built.

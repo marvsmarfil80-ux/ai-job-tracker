@@ -2,7 +2,6 @@
 .env
 *.env
 groq.env
-*token*
 *.pem
 *.key
 
@@ -28,3 +27,13 @@ backups/
 # Database data folders
 pgdata/
 postgres_data/
+
+# Gmail OAuth credentials and tokens
+credentials.json
+client_secret*.json
+token.json
+*.token
+*_token.txt
+
+# Old or rotated secret copies
+*.old
