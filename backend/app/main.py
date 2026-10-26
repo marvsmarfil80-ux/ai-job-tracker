@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
+from app.routers.jobs import router as jobs_router
 
 settings = get_settings()
 
@@ -21,6 +22,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["X-API-Key", "Content-Type"],
 )
+
+app.include_router(jobs_router)
 
 
 @app.get("/health")
