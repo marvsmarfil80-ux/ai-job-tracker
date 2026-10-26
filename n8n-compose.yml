@@ -1,0 +1,24 @@
+name: jobtracker-n8n
+
+services:
+  jobtracker-n8n:
+    image: docker.n8n.io/n8nio/n8n:2.38.1
+    container_name: jobtracker-n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5679:5678"
+    env_file:
+      - n8n.env
+    volumes:
+      - jobtracker_n8n_data:/home/node/.n8n
+    networks:
+      - n8n_default
+
+volumes:
+  jobtracker_n8n_data:
+    name: jobtracker_n8n_data
+
+networks:
+  n8n_default:
+    external: true
+    
