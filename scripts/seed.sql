@@ -11,6 +11,11 @@ INSERT INTO settings (key, value) VALUES
     ('min_score', '40'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
+INSERT INTO settings (key, value) VALUES
+    ('title_exclude_regex', to_jsonb('senior|director|head of|principal|vice president|manager|architect|(?<![a-z])staff(?![a-z])|recruiter|sales|nurse|physician|(?<!non-)(?<!non )(?<!non)voice|call center|(?<![a-z])lead(?![a-z])'::text)),
+    ('title_include_keywords', '["assistant", "data entry", "support", "admin", "junior", "entry", "automation"]'::jsonb)
+ON CONFLICT (key) DO NOTHING;
+
 INSERT INTO profile DEFAULT VALUES
 ON CONFLICT DO NOTHING;
 
