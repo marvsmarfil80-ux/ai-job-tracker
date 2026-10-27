@@ -37,3 +37,6 @@ token.json
 
 # Old or rotated secret copies
 *.old
+
+# Local candidate profile
+profile.txt

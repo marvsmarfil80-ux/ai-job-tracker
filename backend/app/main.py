@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.routers.jobs import router as jobs_router
+from app.routers.score import router as score_router
 
 settings = get_settings()
 
@@ -24,6 +25,7 @@ app.add_middleware(
 )
 
 app.include_router(jobs_router)
+app.include_router(score_router)
 
 
 @app.get("/health")

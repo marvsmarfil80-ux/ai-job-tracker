@@ -37,3 +37,15 @@ Copy both example files and replace the placeholder values:
 Both files are git-ignored. Never commit real credentials.
 
 Setup and usage instructions will be added as the backend is built.
+
+## Scoring
+
+Jobs that pass the title filter are scored from 0 to 100 by Groq (openai/gpt-oss-20b) against a local candidate profile.
+
+Setup: copy profile.txt.example to profile.txt and fill it in with true facts only. profile.txt is ignored by git and must stay under 4000 characters.
+
+Run: POST /score/run?limit=5 with the X-API-Key header. The limit is 1 to 20 (default 5). The request is synchronous, runs the title filter first, and scores high-priority and newest jobs first.
+
+Daily cap: the settings key daily_score_cap limits Groq calls per UTC day. Stored scores and failed calls both count toward it.
+
+Stop reasons: daily_cap_reached, rate_limited, groq_unavailable, groq_auth_error.

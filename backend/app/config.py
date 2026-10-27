@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     api_key: SecretStr
     n8n_writer_password: SecretStr
     groq_mock: bool = False
+    groq_model: str = "openai/gpt-oss-20b"
+    profile_path: Path = REPO_ROOT / "profile.txt"
+    score_interval_seconds: float = 3.0
 
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
