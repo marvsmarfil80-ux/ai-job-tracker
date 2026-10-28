@@ -5,7 +5,7 @@ INSERT INTO sources (name, badge, max_runs_per_day) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO settings (key, value) VALUES
-    ('daily_score_cap', '300'::jsonb),
+    ('daily_score_cap', '150'::jsonb),
     ('apply_threshold', '70'::jsonb),
     ('maybe_threshold', '40'::jsonb),
     ('min_score', '40'::jsonb)

@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
+from app.routers.hunts import router as hunts_router
 from app.routers.jobs import router as jobs_router
 from app.routers.score import router as score_router
+from app.routers.sources import router as sources_router
 
 settings = get_settings()
 
@@ -26,6 +28,8 @@ app.add_middleware(
 
 app.include_router(jobs_router)
 app.include_router(score_router)
+app.include_router(hunts_router)
+app.include_router(sources_router)
 
 
 @app.get("/health")
