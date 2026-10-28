@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     groq_model: str = "openai/gpt-oss-20b"
     profile_path: Path = REPO_ROOT / "profile.txt"
     score_interval_seconds: float = 8.0
+    scheduler_thread_enabled: bool = True
 
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 

@@ -1,5 +1,6 @@
 import os
 os.environ["POSTGRES_DB"] = "jobtracker_test"
+os.environ["SCHEDULER_THREAD_ENABLED"] = "false"
 
 import pytest
 from sqlalchemy import text

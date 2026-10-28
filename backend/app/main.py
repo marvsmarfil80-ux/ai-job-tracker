@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -11,14 +13,30 @@ from app.routers.notifications import router as notifications_router
 from app.routers.score import router as score_router
 from app.routers.settings import router as settings_router
 from app.routers.sources import router as sources_router
+from app.services.scheduler import SchedulerThread
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    scheduler = None
+    if settings.scheduler_thread_enabled:
+        scheduler = SchedulerThread()
+        scheduler.start()
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            scheduler.stop()
+
 
 app = FastAPI(
     title="AI Job Tracker API",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
