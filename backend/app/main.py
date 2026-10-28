@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.routers.hunts import router as hunts_router
 from app.routers.jobs import router as jobs_router
+from app.routers.notifications import router as notifications_router
 from app.routers.score import router as score_router
 from app.routers.settings import router as settings_router
 from app.routers.sources import router as sources_router
@@ -32,6 +33,7 @@ app.include_router(score_router)
 app.include_router(hunts_router)
 app.include_router(sources_router)
 app.include_router(settings_router)
+app.include_router(notifications_router)
 
 
 @app.get("/health")

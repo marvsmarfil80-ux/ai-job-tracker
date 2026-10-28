@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session
 from app.db import engine
 from app.services.feeds import PARSERS, FeedError, FeedJob, fetch_feed
 from app.services.jobs import priority_for_source
+from app.services.notifications import notify_hunt_done
 
 LOCK_KEY = 5150002
 COMPONENT = "feeds"
 TRIGGER_MANUAL = "manual"
+TRIGGER_SCHEDULED = "scheduled"
 DEFAULT_MAX_RUNS_PER_DAY = 4
 DAY_START_SQL = (
     "(date_trunc('day', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila')"
@@ -179,14 +181,19 @@ def close_run(db: Session, run_id: int, status: str, total_new: int) -> None:
     db.commit()
 
 
-def execute_hunt(db: Session, client: httpx.Client, requested: list[str] | None) -> int:
+def execute_hunt(
+    db: Session,
+    client: httpx.Client,
+    requested: list[str] | None,
+    trigger: str = TRIGGER_MANUAL,
+) -> int:
     rows = db.execute(
         text("select name, enabled, max_runs_per_day from sources order by id")
     ).mappings().all()
     plan = build_plan(rows, requested)
     run_id = db.execute(
         text("insert into search_runs (trigger) values (:trigger) returning id"),
-        {"trigger": TRIGGER_MANUAL},
+        {"trigger": trigger},
     ).scalar_one()
     db.commit()
 
@@ -206,10 +213,12 @@ def execute_hunt(db: Session, client: httpx.Client, requested: list[str] | None)
     except Exception:
         db.rollback()
         close_run(db, run_id, "error", total_new)
+        notify_hunt_done(db, run_id, "error", unexpected=True)
         raise
 
     final = "error" if statuses and all(item == "error" for item in statuses) else "done"
     close_run(db, run_id, final, total_new)
+    notify_hunt_done(db, run_id, final)
     return run_id
 
 
@@ -259,10 +268,15 @@ def list_runs(db: Session, limit: int, offset: int) -> tuple[list[dict], int]:
     return [{**dict(run), "steps": grouped.get(run["id"], [])} for run in runs], total
 
 
-def run_hunt(db: Session, client: httpx.Client, requested: list[str] | None) -> dict:
+def run_hunt(
+    db: Session,
+    client: httpx.Client,
+    requested: list[str] | None,
+    trigger: str = TRIGGER_MANUAL,
+) -> dict:
     lock = acquire_lock()
     try:
-        run_id = execute_hunt(db, client, requested)
+        run_id = execute_hunt(db, client, requested, trigger)
     finally:
         release_lock(lock)
     return load_run(db, run_id)

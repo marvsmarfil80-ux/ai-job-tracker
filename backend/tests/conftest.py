@@ -22,7 +22,7 @@ def _assert_test_database(connection):
 def _clean(connection):
     _assert_test_database(connection)
     connection.execute(text("truncate table jobs restart identity cascade"))
-
+    connection.execute(text("delete from notifications"))
 
 @pytest.fixture(scope="session", autouse=True)
 def prepare_database():
