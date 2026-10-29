@@ -109,7 +109,7 @@ def score_step(now, state, values, session_factory, groq_client_factory, sleep) 
                 state.last_score_attempt = previous
                 return "locked"
             detail = str(exc.detail)
-            level = "warning" if detail.startswith("profile.txt") else "error"
+            level = "warning" if detail.startswith("Profile is not set") else "error"
             warn_once(state, session_factory, now, level, f"Scheduled scoring skipped: {detail}")
             return "skipped"
     reason = result["stopped_reason"]

@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     n8n_writer_password: SecretStr
     groq_mock: bool = False
     groq_model: str = "openai/gpt-oss-20b"
-    profile_path: Path = REPO_ROOT / "profile.txt"
     score_interval_seconds: float = 8.0
     scheduler_thread_enabled: bool = True
 

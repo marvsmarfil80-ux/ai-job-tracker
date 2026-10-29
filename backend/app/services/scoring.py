@@ -237,7 +237,7 @@ def run_scoring(
     sleep: Callable[[float], None] | None = None,
 ) -> dict:
     sleep = sleep or time.sleep
-    profile = get_profile_text()
+    profile = get_profile_text(db)
     lock = acquire_lock()
     try:
         return execute_run(db, client, profile, limit, sleep)

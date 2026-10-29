@@ -128,7 +128,7 @@ def scheduler_environment(monkeypatch):
     reset_tables()
     write_settings()
     monkeypatch.setattr(get_settings(), "groq_mock", True)
-    monkeypatch.setattr("app.services.scoring.get_profile_text", lambda: PROFILE_MARKER)
+    monkeypatch.setattr("app.services.scoring.get_profile_text", lambda db: PROFILE_MARKER)
     yield
     reset_tables()
     write_settings(scheduler_enabled=False, score_batch_limit=10)
@@ -293,8 +293,8 @@ def test_scoring_lock_conflict_is_silent_and_retried_next_tick():
 
 
 def test_missing_profile_warns_once_and_leaks_nothing(monkeypatch):
-    def missing():
-        raise HTTPException(status_code=500, detail="profile.txt is missing")
+    def missing(db):
+        raise HTTPException(status_code=500, detail="Profile is not set. Save a profile with PUT /profile first.")
 
     monkeypatch.setattr("app.services.scoring.get_profile_text", missing)
     add_run(hours_ago=1)
@@ -303,7 +303,7 @@ def test_missing_profile_warns_once_and_leaks_nothing(monkeypatch):
     assert do_tick(state, NOW)["scoring"] == "skipped"
     assert do_tick(state, NOW + timedelta(minutes=31))["scoring"] == "skipped"
     events = scheduler_events()
-    assert events == [("warning", "Scheduled scoring skipped: profile.txt is missing")]
+    assert events == [("warning", "Scheduled scoring skipped: Profile is not set. Save a profile with PUT /profile first.")]
     assert do_tick(state, NOW + timedelta(hours=2))["scoring"] == "skipped"
     assert len(scheduler_events()) == 2
     assert count("select count(*) from job_scores") == 0
@@ -394,3 +394,18 @@ def test_scheduler_thread_survives_tick_exceptions(monkeypatch):
     runner.stop()
     assert len(calls) >= 2
     assert not runner.thread.is_alive()
+
+
+def test_empty_database_profile_warns_once_with_real_reader(monkeypatch):
+    from app.services.profile import get_profile_text
+
+    monkeypatch.setattr("app.services.scoring.get_profile_text", get_profile_text)
+    add_run(hours_ago=1)
+    add_jobs(1)
+    state = SchedulerState()
+    assert do_tick(state, NOW)["scoring"] == "skipped"
+    assert do_tick(state, NOW + timedelta(minutes=31))["scoring"] == "skipped"
+    assert scheduler_events() == [
+        ("warning", "Scheduled scoring skipped: Profile is not set. Save a profile with PUT /profile first.")
+    ]
+    assert count("select count(*) from job_scores") == 0

@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.db import engine
 from app.main import app
 from app.services import scoring
+from app.services.profile import NOT_SET_DETAIL
 from app.services.groq_client import (
     GroqAuthError,
     call_groq,
@@ -54,6 +55,17 @@ def set_setting(key, value):
 def clear_events():
     with engine.begin() as connection:
         connection.execute(text("delete from system_events"))
+
+
+def set_profile(content):
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "insert into profile (id, content, updated_at) values (1, :content, now()) "
+                "on conflict (id) do update set content = excluded.content"
+            ),
+            {"content": content},
+        )
 
 
 def add_job(title="Admin Assistant", priority=0, status="new", description="Data entry for a small team"):
@@ -171,11 +183,9 @@ class Script:
 
 
 @pytest.fixture(autouse=True)
-def scoring_environment(tmp_path, monkeypatch):
+def scoring_environment(monkeypatch, clean_tables):
     settings = get_settings()
-    profile = tmp_path / "profile.txt"
-    profile.write_text(PROFILE_TEXT, encoding="utf-8")
-    monkeypatch.setattr(settings, "profile_path", profile)
+    set_profile(PROFILE_TEXT)
     monkeypatch.setattr(settings, "score_interval_seconds", 0.0)
     monkeypatch.setattr(settings, "groq_api_key", SecretStr(FAKE_KEY))
     monkeypatch.setattr(settings, "groq_mock", False)
@@ -184,7 +194,7 @@ def scoring_environment(tmp_path, monkeypatch):
     set_setting("title_include_keywords", INCLUDE_KEYWORDS)
     set_setting("daily_score_cap", 300)
     clear_events()
-    yield profile
+    yield
     clear_events()
 
 
@@ -571,27 +581,28 @@ def test_concurrent_run_is_rejected(client, headers, groq):
     assert job_state(job_id).pipeline_status == "new"
 
 
-def test_missing_profile_file(client, headers, groq, tmp_path, monkeypatch):
+def test_profile_not_set(client, headers, groq):
     script = groq(Script(ok()))
-    monkeypatch.setattr(get_settings(), "profile_path", tmp_path / "missing.txt")
+    with engine.begin() as connection:
+        connection.execute(text("delete from profile"))
     add_job()
     response = run(client, headers)
     assert response.status_code == 500
-    assert response.json()["detail"] == "profile.txt is missing"
+    assert response.json()["detail"] == NOT_SET_DETAIL
     assert script.calls == 0
 
 
 @pytest.mark.parametrize(
     "content, detail",
     [
-        ("", "profile.txt is empty"),
-        ("   \n", "profile.txt is empty"),
-        ("x" * 4001, "profile.txt is longer than 4000 characters"),
+        ("", NOT_SET_DETAIL),
+        ("   \n", NOT_SET_DETAIL),
+        ("Email: test@example.com\nPhone: 555-0100", NOT_SET_DETAIL),
     ],
 )
-def test_bad_profile_content(client, headers, groq, scoring_environment, content, detail):
+def test_bad_profile_content(client, headers, groq, content, detail):
     groq(Script(ok()))
-    scoring_environment.write_text(content, encoding="utf-8")
+    set_profile(content)
     response = run(client, headers)
     assert response.status_code == 500
     assert response.json()["detail"] == detail
@@ -619,3 +630,19 @@ def test_api_key_is_required(client, groq):
     assert client.post("/score/run").status_code == 401
     assert client.post("/score/run", headers={"X-API-Key": "wrong"}).status_code == 401
     assert script.calls == 0
+
+
+def test_groq_request_contains_only_sanitized_profile(client, headers, groq):
+    set_profile(
+        "Skills: Python basics\nPhone: 555-0100\nContact me at test@example.com or 555-0100"
+    )
+    script = groq(Script(ok()))
+    add_job()
+    response = run(client, headers)
+    assert response.status_code == 200
+    assert script.calls == 1
+    body = script.requests[0].content
+    assert b"Python basics" in body
+    assert b"test@example.com" not in body
+    assert b"555-0100" not in body
+    assert b"[removed]" in body

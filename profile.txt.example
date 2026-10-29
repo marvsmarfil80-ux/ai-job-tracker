@@ -1,5 +1,7 @@
+This is a draft template. Copy it to profile.txt, fill it in, then run scripts/set_profile.py to save it.
+profile.txt is not committed and the app does not read it. The saved profile lives in the database.
 Write only true facts. Do not invent qualifications or experience.
-Copy this file to profile.txt and fill it in. profile.txt is not committed.
+Keep it under 2000 characters. Do not include an address, phone number or email.
 
 Target roles:
 -
