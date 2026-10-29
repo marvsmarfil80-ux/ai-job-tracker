@@ -86,6 +86,7 @@ def call_groq(
         "messages": messages,
         "temperature": 0,
         "max_tokens": MAX_TOKENS,
+        "reasoning_effort": settings.groq_reasoning_effort,
     }
 
     rate_retries = 0

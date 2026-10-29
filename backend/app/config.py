@@ -9,6 +9,7 @@ Real environment variables, if set, take precedence over the files.
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,7 +36,8 @@ class Settings(BaseSettings):
     n8n_writer_password: SecretStr
     groq_mock: bool = False
     groq_model: str = "openai/gpt-oss-20b"
-    score_interval_seconds: float = 8.0
+    groq_reasoning_effort: Literal["low", "medium", "high"] = "low"
+    score_interval_seconds: float = 12.0
     scheduler_thread_enabled: bool = True
 
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]

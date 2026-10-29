@@ -364,8 +364,18 @@ def test_scores_new_jobs(client, headers, groq):
     assert payload["model"] == "openai/gpt-oss-20b"
     assert payload["temperature"] == 0
     assert payload["max_tokens"] == 400
+    assert payload["reasoning_effort"] == "low"
     assert PROFILE_TEXT in payload["messages"][1]["content"]
     assert FAKE_KEY not in response.text
+
+def test_reasoning_effort_comes_from_config(client, headers, groq, monkeypatch):
+    monkeypatch.setattr(get_settings(), "groq_reasoning_effort", "high")
+    script = groq(Script(ok(score=60, reason="Fine fit", red_flags=[], tokens=100)))
+    add_job()
+    response = run(client, headers)
+    assert response.status_code == 200, response.text
+    payload = json.loads(script.requests[0].content)
+    assert payload["reasoning_effort"] == "high"
 
 
 def test_limit_and_priority_order(client, headers, groq):
