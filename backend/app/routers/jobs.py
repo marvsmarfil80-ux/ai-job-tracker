@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_,exists, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Job
+from app.models import Application, Job
 from app.schemas.jobs import (
     JobCreate,
     JobList,
@@ -96,6 +96,7 @@ def list_jobs(
     verdict: Verdict | None = None,
     q: str | None = Query(default=None, min_length=1, max_length=200),
     pipeline_status: PipelineStatus | None = None,
+    awaiting_apply: bool | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=1000000),
     db: Session = Depends(get_db),
@@ -110,6 +111,12 @@ def list_jobs(
         conditions.append(Job.source == source)
     if pipeline_status is not None:
         conditions.append(Job.pipeline_status == pipeline_status)
+    if awaiting_apply is not None:
+        awaiting = and_(
+            Job.opened_at.is_not(None),
+            ~exists().where(Application.job_id == Job.id),
+        )
+        conditions.append(awaiting if awaiting_apply else not_(awaiting))
     if q is not None:
         escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
@@ -159,3 +166,18 @@ def update_job(payload: JobUpdate, job_id: int = JobId, db: Session = Depends(ge
     db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
     return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+
+@router.post("/{job_id}/open", response_model=JobOut)
+def mark_job_opened(job_id: int = JobId, db: Session = Depends(get_db)):
+    job = get_job_or_404(db, job_id)
+    db.execute(
+        update(Job)
+        .where(Job.id == job_id, Job.opened_at.is_(None))
+        .values(opened_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+    db.commit()
+    db.refresh(job)
+    apply_threshold, maybe_threshold = get_thresholds(db)
+    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+

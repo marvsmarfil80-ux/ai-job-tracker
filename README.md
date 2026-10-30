@@ -87,6 +87,31 @@ Daily cap: the settings key daily_score_cap limits Groq calls per UTC day. Store
 
 Stop reasons: daily_cap_reached, rate_limited, groq_unavailable, groq_auth_error.
 
+## Applications
+
+Applications are created only by you. The app never submits an application and never decides on its own that you applied.
+
+"Did you apply?" flow:
+
+1. `POST /jobs/{id}/open` records that you opened the listing. It sets `opened_at` once (the first call wins and later calls do not change it). It does not create an application and does not change the pipeline status.
+2. `GET /jobs?awaiting_apply=true` lists jobs that were opened and have no application yet. `awaiting_apply=false` returns all other jobs. Without the parameter, the list behaves as before.
+3. If you applied, call `POST /applications`. If you did not, nothing is recorded.
+
+Endpoints (all require the `X-API-Key` header):
+
+- `POST /applications` with body `{"job_id": 1, "applied_at": "<ISO 8601 with timezone>", "notes": "<text>"}`. Only `job_id` is required. The status is set to `applied` and the first history event is written. `applied_at` defaults to now and cannot be more than 1 day in the future. `notes` can have up to 2000 characters. A job in any pipeline status is accepted. A second application for the same job returns 409 with `existing_id`.
+- `GET /applications` supports `status`, `job_id`, `q` (searches job title and company), `limit` (default 50, maximum 200) and `offset`. The newest `applied_at` comes first. Each item includes a summary of its job.
+- `GET /applications/{id}` returns the application with its `events` (status history, oldest first).
+- `PATCH /applications/{id}` changes only `status` and `notes`. Any of the seven statuses can be set, because there are no transition rules yet. A status change writes a history event in the same transaction as the update. Setting the same status writes no event.
+
+Statuses: `applied`, `under_review`, `assessment`, `interview`, `offer`, `rejected`, `withdrawn`.
+
+Not available yet: deleting an application (use `withdrawn` instead), a "dismissed" state for listings you did not apply to, and notifications for status changes.
+
+Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
+
+    curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"job_id": 1, "notes": "Applied on the company site"}' http://127.0.0.1:8000/applications
+
 ## Test database
 
 Tests run against a separate database named `jobtracker_test` in the same PostgreSQL container, and refuse to run against any other database.
