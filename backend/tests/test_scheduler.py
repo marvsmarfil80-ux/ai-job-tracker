@@ -198,7 +198,7 @@ def test_disabled_scheduler_does_nothing():
     write_settings(scheduler_enabled=False)
     add_jobs(3)
     summary = do_tick(SchedulerState())
-    assert summary == {"enabled": False, "hunt": None, "scoring": None}
+    assert summary == {"enabled": False, "hunt": None, "scoring": None, "reminders": 0}
     assert count("select count(*) from search_runs") == 0
     assert count("select count(*) from job_scores") == 0
 

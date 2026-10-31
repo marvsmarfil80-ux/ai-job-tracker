@@ -112,6 +112,28 @@ Example (replace `<API_KEY>` with your own key, and do not paste it anywhere pub
 
     curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"job_id": 1, "notes": "Applied on the company site"}' http://127.0.0.1:8000/applications
 
+## Follow-ups and overdue reminders
+
+A follow-up is a simple to-do item attached to one application. It has a title, an optional due date and a status (`pending` or `completed`). The server sets `completed_at` when a follow-up becomes `completed` and clears it when it goes back to `pending`.
+
+Endpoints (all require the `X-API-Key` header):
+
+- `POST /follow-ups` creates a follow-up (`application_id`, `title`, optional `due_date` as `YYYY-MM-DD`).
+- `GET /follow-ups` lists follow-ups. Filters: `status`, `application_id`, `overdue`, `limit`, `offset`.
+- `GET /follow-ups/{id}` returns one follow-up with a short summary of its application.
+- `PATCH /follow-ups/{id}` changes `title`, `due_date` (null clears it) or `status`.
+- `DELETE /follow-ups/{id}` deletes a follow-up. Deleting an application is still not available.
+
+A follow-up is overdue when it is pending and its due date is before today in the Asia/Manila time zone. A due date of today is not overdue. `is_overdue` is calculated on every response and is not stored.
+
+Reminders: the scheduler checks for overdue follow-ups on its first tick after startup and then at most once per hour. Each overdue follow-up gets one in-app notification of type `follow_up_overdue` with the link `/follow-ups/{id}`. A follow-up is not notified again unless its due date is moved later and passes again. Completed follow-ups and follow-ups without a due date never notify. Follow-ups on rejected or withdrawn applications still notify. Notifications are not deleted when a follow-up is deleted.
+
+The setting `followup_reminders_enabled` (default `true`) turns reminders on or off. Reminders only use the database, so they run even when `scheduler_enabled` is `false`. Hunts and scoring still run only when `scheduler_enabled` is `true`.
+
+Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
+
+    curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"application_id": 1, "title": "Email the recruiter", "due_date": "2026-11-05"}' http://127.0.0.1:8000/follow-ups
+    
 ## Test database
 
 Tests run against a separate database named `jobtracker_test` in the same PostgreSQL container, and refuse to run against any other database.

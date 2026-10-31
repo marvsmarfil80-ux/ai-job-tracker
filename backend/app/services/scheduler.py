@@ -8,7 +8,9 @@ from fastapi import HTTPException
 from sqlalchemy import text
 
 from app.db import SessionLocal
+from app.services.clock import manila_today
 from app.services.feeds import get_feed_client
+from app.services.follow_up_reminders import create_reminder, find_overdue_without_reminder
 from app.services.groq_client import get_groq_client
 from app.services.hunts import TRIGGER_SCHEDULED, run_hunt
 from app.services.scoring import run_scoring
@@ -17,6 +19,7 @@ from app.services.settings import read_values
 COMPONENT = "scheduler"
 TICK_SECONDS = 60.0
 WARNING_REPEAT_SECONDS = 3600.0
+REMINDER_CHECK_SECONDS = 3600.0
 STOP_LEVELS = {
     "rate_limited": "warning",
     "groq_unavailable": "warning",
@@ -27,6 +30,7 @@ STOP_LEVELS = {
 @dataclass
 class SchedulerState:
     last_score_attempt: datetime | None = None
+    last_reminder_check: datetime | None = None
     last_warning: dict[str, datetime] = field(default_factory=dict)
 
 
@@ -126,6 +130,32 @@ def score_step(now, state, values, session_factory, groq_client_factory, sleep) 
     return "ran"
 
 
+def reminder_step(now, state, values, session_factory) -> str | int:
+    if values["followup_reminders_enabled"] is not True:
+        return "disabled"
+    previous = state.last_reminder_check
+    if previous is not None and (now - previous).total_seconds() < REMINDER_CHECK_SECONDS:
+        return "not_due"
+    state.last_reminder_check = now
+    created = 0
+    with session_factory() as db:
+        rows = find_overdue_without_reminder(db, manila_today(now))
+        for row in rows:
+            try:
+                create_reminder(db, row)
+                created += 1
+            except Exception as exc:
+                db.rollback()
+                warn_once(
+                    state,
+                    session_factory,
+                    now,
+                    "error",
+                    f"Follow-up reminder failed: {type(exc).__name__}",
+                )
+    return created
+
+
 def tick(
     now: datetime,
     state: SchedulerState,
@@ -134,7 +164,7 @@ def tick(
     feed_client_factory=default_feed_client,
     sleep: Callable[[float], None] | None = None,
 ) -> dict:
-    summary = {"enabled": False, "hunt": None, "scoring": None}
+    summary = {"enabled": False, "hunt": None, "scoring": None, "reminders": None}
     try:
         with session_factory() as db:
             values = read_values(db)
@@ -147,6 +177,17 @@ def tick(
             f"Scheduler could not read settings: {type(exc).__name__}",
         )
         return summary
+    try:
+        summary["reminders"] = reminder_step(now, state, values, session_factory)
+    except Exception as exc:
+        summary["reminders"] = "error"
+        warn_once(
+            state,
+            session_factory,
+            now,
+            "error",
+            f"Follow-up reminder check failed: {type(exc).__name__}",
+        )
     if values["scheduler_enabled"] is not True:
         return summary
     summary["enabled"] = True

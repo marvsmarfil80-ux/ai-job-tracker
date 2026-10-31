@@ -21,6 +21,7 @@ class SettingsUpdate(BaseModel):
     hunt_interval_hours: int | None = Field(default=None, strict=True, ge=1, le=24)
     score_interval_minutes: int | None = Field(default=None, strict=True, ge=5, le=240)
     score_batch_limit: int | None = Field(default=None, strict=True, ge=1, le=20)
+    followup_reminders_enabled: bool | None = Field(default=None, strict=True)
 
     @field_validator("title_exclude_regex")
     @classmethod

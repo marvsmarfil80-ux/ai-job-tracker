@@ -21,6 +21,7 @@ BASELINE = {
     "hunt_interval_hours": 6,
     "score_interval_minutes": 30,
     "score_batch_limit": 10,
+    "followup_reminders_enabled": True,
 }
 PUBLIC_KEYS = sorted(key for key in BASELINE if key != "min_score")
 
@@ -278,3 +279,53 @@ def test_get_returns_defaults_for_missing_scheduler_keys(client, headers):
     assert data["hunt_interval_hours"]["value"] == 6
     assert data["score_interval_minutes"]["value"] == 30
     assert data["score_batch_limit"]["value"] == 10
+
+
+def test_get_shows_followup_reminders_setting(client, headers):
+    response = client.get("/settings", headers=headers)
+    assert response.status_code == 200
+    item = response.json()["settings"]["followup_reminders_enabled"]
+    assert item["value"] is True
+    assert item["description"]
+
+
+def test_followup_reminders_default_is_true_when_row_is_missing(client, headers):
+    with engine.begin() as connection:
+        connection.execute(
+            text("delete from settings where key = 'followup_reminders_enabled'")
+        )
+    response = client.get("/settings", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["settings"]["followup_reminders_enabled"]["value"] is True
+
+
+def test_patch_followup_reminders_boolean_is_saved(client, headers):
+    response = patch(client, headers, {"followup_reminders_enabled": False})
+    assert response.status_code == 200
+    assert response.json()["settings"]["followup_reminders_enabled"]["value"] is False
+    assert read_db("followup_reminders_enabled") is False
+    response = patch(client, headers, {"followup_reminders_enabled": True})
+    assert response.status_code == 200
+    assert read_db("followup_reminders_enabled") is True
+
+
+@pytest.mark.parametrize("value", ["true", "false", 1, 0, None])
+def test_patch_followup_reminders_rejects_non_boolean(client, headers, value):
+    response = patch(client, headers, {"followup_reminders_enabled": value})
+    assert response.status_code == 422
+    assert read_db("followup_reminders_enabled") is True
+
+
+def test_followup_reminders_is_part_of_the_atomic_patch(client, headers):
+    response = patch(
+        client, headers, {"followup_reminders_enabled": False, "daily_score_cap": 0}
+    )
+    assert response.status_code == 422
+    assert read_db("followup_reminders_enabled") is True
+    assert read_db("daily_score_cap") == 150
+    response = patch(
+        client, headers, {"followup_reminders_enabled": False, "score_batch_limit": 3}
+    )
+    assert response.status_code == 200
+    assert read_db("followup_reminders_enabled") is False
+    assert read_db("score_batch_limit") == 3

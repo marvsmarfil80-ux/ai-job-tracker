@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.routers.applications import router as applications_router
+from app.routers.follow_ups import router as follow_ups_router
 from app.routers.hunts import router as hunts_router
 from app.routers.jobs import router as jobs_router
 from app.routers.notifications import router as notifications_router
@@ -56,6 +57,8 @@ app.include_router(settings_router)
 app.include_router(notifications_router)
 app.include_router(profile_router)
 app.include_router(applications_router)
+app.include_router(follow_ups_router)
+
 
 
 @app.get("/health")

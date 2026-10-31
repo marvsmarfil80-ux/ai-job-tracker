@@ -15,6 +15,7 @@ DESCRIPTIONS = {
     "hunt_interval_hours": "Hours between automatic hunts (per-source daily limits still apply).",
     "score_interval_minutes": "Minutes between automatic scoring runs.",
     "score_batch_limit": "Maximum Groq calls per automatic scoring run.",
+    "followup_reminders_enabled": "Whether overdue follow-up reminders are created (runs even when scheduler_enabled is false).",
 }
 
 DEFAULTS = {
@@ -25,6 +26,7 @@ DEFAULTS = {
     "hunt_interval_hours": 6,
     "score_interval_minutes": 30,
     "score_batch_limit": 10,
+    "followup_reminders_enabled": True,
 }
 
 KEYS = tuple(DESCRIPTIONS)
