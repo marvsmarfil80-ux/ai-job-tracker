@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Identity,
+    SmallInteger,
     Text,
     UniqueConstraint,
     text,
@@ -42,6 +43,10 @@ class Email(Base):
             "'info_request', 'rejection', 'offer')",
             name="class_valid",
         ),
+        CheckConstraint(
+            "confidence IS NULL OR confidence BETWEEN 0 AND 100",
+            name="confidence_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -56,6 +61,10 @@ class Email(Base):
         Text, server_default="unprocessed", index=True
     )
     email_class: Mapped[str | None] = mapped_column("class", Text)
+    confidence: Mapped[int | None] = mapped_column(SmallInteger)
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
     application_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("applications.id", ondelete="SET NULL"), index=True
     )

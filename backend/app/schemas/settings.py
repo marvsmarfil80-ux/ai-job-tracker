@@ -22,6 +22,11 @@ class SettingsUpdate(BaseModel):
     score_interval_minutes: int | None = Field(default=None, strict=True, ge=5, le=240)
     score_batch_limit: int | None = Field(default=None, strict=True, ge=1, le=20)
     followup_reminders_enabled: bool | None = Field(default=None, strict=True)
+    email_auto_status_enabled: bool | None = Field(default=None, strict=True)
+    email_auto_status_min_confidence: int | None = Field(
+        default=None, strict=True, ge=50, le=100
+    )
+    email_classify_daily_cap: int | None = Field(default=None, strict=True, ge=1, le=100)
 
     @field_validator("title_exclude_regex")
     @classmethod

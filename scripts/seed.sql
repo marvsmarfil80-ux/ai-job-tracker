@@ -33,3 +33,10 @@ ON CONFLICT DO NOTHING;
 INSERT INTO allowed_senders (sender, kind) VALUES
     ('jobs-noreply@linkedin.com', 'job_alert')
 ON CONFLICT (sender, kind) DO NOTHING;
+
+
+INSERT INTO settings (key, value) VALUES
+    ('email_auto_status_enabled', 'true'::jsonb),
+    ('email_auto_status_min_confidence', '85'::jsonb),
+    ('email_classify_daily_cap', '30'::jsonb)
+ON CONFLICT (key) DO NOTHING;

@@ -22,6 +22,9 @@ BASELINE = {
     "score_interval_minutes": 30,
     "score_batch_limit": 10,
     "followup_reminders_enabled": True,
+    "email_auto_status_enabled": True,
+    "email_auto_status_min_confidence": 85,
+    "email_classify_daily_cap": 30,
 }
 PUBLIC_KEYS = sorted(key for key in BASELINE if key != "min_score")
 

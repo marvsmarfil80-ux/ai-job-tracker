@@ -49,6 +49,9 @@ class ApplicationEvent(Base):
             name="from_status_valid",
         ),
         CheckConstraint(f"to_status IN ({_STATUS_SQL})", name="to_status_valid"),
+        CheckConstraint(
+            "source IN ('manual', 'email', 'undo')", name="source_valid"
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -59,6 +62,10 @@ class ApplicationEvent(Base):
     to_status: Mapped[str] = mapped_column(Text)
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    source: Mapped[str] = mapped_column(Text, server_default="manual")
+    email_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("emails.id", ondelete="SET NULL")
     )
 
 

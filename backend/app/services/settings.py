@@ -16,6 +16,9 @@ DESCRIPTIONS = {
     "score_interval_minutes": "Minutes between automatic scoring runs.",
     "score_batch_limit": "Maximum Groq calls per automatic scoring run.",
     "followup_reminders_enabled": "Whether overdue follow-up reminders are created (runs even when scheduler_enabled is false).",
+    "email_auto_status_enabled": "Whether an email may automatically change an application status (false means notification only).",
+    "email_auto_status_min_confidence": "Minimum classifier confidence (50 to 100) required for an automatic status change.",
+    "email_classify_daily_cap": "Maximum Groq email classification calls per day (UTC day), separate from daily_score_cap.",
 }
 
 DEFAULTS = {
@@ -27,6 +30,9 @@ DEFAULTS = {
     "score_interval_minutes": 30,
     "score_batch_limit": 10,
     "followup_reminders_enabled": True,
+    "email_auto_status_enabled": True,
+    "email_auto_status_min_confidence": 85,
+    "email_classify_daily_cap": 30,
 }
 
 KEYS = tuple(DESCRIPTIONS)
