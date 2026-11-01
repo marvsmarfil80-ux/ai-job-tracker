@@ -186,3 +186,17 @@ def test_meta_without_location():
 def test_control_and_invisible_characters_are_removed():
     result = parse_linkedin_alert(page(card("Sup\u200bport\x00 Agent\x07")))
     assert result.jobs[0].title == "Support Agent"
+
+def test_card_wrapped_in_one_link_with_dot_separator():
+    html = (
+        "<html><body><table><tr><td>"
+        f'<a href="{link(41)}"><table><tr><td><div>Support Agent</div></td></tr>'
+        "<tr><td><p>Example Corp \u00b7 Manila, Philippines (Remote)</p></td></tr>"
+        "</table></a></td></tr></table></body></html>"
+    )
+    job = parse_linkedin_alert(html).jobs[0]
+    assert job.title == "Support Agent"
+    assert job.company == "Example Corp"
+    assert job.location == "Manila, Philippines"
+    assert job.work_mode == "remote"
+    assert job.url == "https://www.linkedin.com/jobs/view/41/"

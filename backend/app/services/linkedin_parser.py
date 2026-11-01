@@ -203,11 +203,16 @@ def _parse_meta(line: _Line | None) -> tuple[str | None, str | None, str | None]
     if match:
         work_mode = WORK_MODES[match.group(1).lower()]
         parts[-1] = parts[-1][: match.start()].strip()
-    parts = [part for part in parts if part]
-    if not parts:
+    pieces: list[str] = []
+    for part in parts:
+        for piece in part.split("\u00b7"):
+            piece = piece.strip()
+            if piece:
+                pieces.append(piece)
+    if not pieces:
         return None, None, work_mode
-    company = parts[0]
-    location = " ".join(parts[1:]) or None
+    company = pieces[0]
+    location = " ".join(pieces[1:]) or None
     return _limit(company), _limit(location), work_mode
 
 
