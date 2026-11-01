@@ -17,6 +17,7 @@ SELECT_NEEDING_REMINDER = text(
     "join applications a on a.id = f.application_id "
     "join jobs j on j.id = a.job_id "
     "where f.status = 'pending' and f.due_date is not null and f.due_date < :today "
+    "and a.status not in ('rejected', 'withdrawn') "
     "and not exists ("
     "select 1 from notifications n "
     "where n.type = 'follow_up_overdue' "
