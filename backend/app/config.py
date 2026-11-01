@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     api_key: SecretStr
     n8n_writer_password: SecretStr
+    n8n_webhook_url: SecretStr | None = None
+    n8n_webhook_key: SecretStr | None = None
     groq_mock: bool = False
     groq_model: str = "openai/gpt-oss-20b"
     groq_reasoning_effort: Literal["low", "medium", "high"] = "low"
