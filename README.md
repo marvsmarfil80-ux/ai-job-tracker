@@ -106,7 +106,7 @@ Endpoints (all require the `X-API-Key` header):
 
 Statuses: `applied`, `under_review`, `assessment`, `interview`, `offer`, `rejected`, `withdrawn`.
 
-Not available yet: deleting an application (use `withdrawn` instead), a "dismissed" state for listings you did not apply to, and notifications for status changes.
+Not available yet: deleting an application (use `withdrawn` instead) and a "dismissed" state for listings you did not apply to.
 
 Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
 
@@ -126,13 +126,48 @@ Endpoints (all require the `X-API-Key` header):
 
 A follow-up is overdue when it is pending and its due date is before today in the Asia/Manila time zone. A due date of today is not overdue. `is_overdue` is calculated on every response and is not stored.
 
-Reminders: the scheduler checks for overdue follow-ups on its first tick after startup and then at most once per hour. Each overdue follow-up gets one in-app notification of type `follow_up_overdue` with the link `/follow-ups/{id}`. A follow-up is not notified again unless its due date is moved later and passes again. Completed follow-ups and follow-ups without a due date never notify. Follow-ups on rejected or withdrawn applications still notify. Notifications are not deleted when a follow-up is deleted.
+Reminders: the scheduler checks for overdue follow-ups on its first tick after startup and then at most once per hour. Each overdue follow-up gets one in-app notification of type `follow_up_overdue` with the link `/follow-ups/{id}`. A follow-up is not notified again unless its due date is moved later and passes again. Completed follow-ups and follow-ups without a due date never notify. Follow-ups on rejected or withdrawn applications do not create new reminders. Notifications that already exist are kept.
 
 The setting `followup_reminders_enabled` (default `true`) turns reminders on or off. Reminders only use the database, so they run even when `scheduler_enabled` is `false`. Hunts and scoring still run only when `scheduler_enabled` is `true`.
 
 Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
 
     curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"application_id": 1, "title": "Email the recruiter", "due_date": "2026-11-05"}' http://127.0.0.1:8000/follow-ups
+## Email processing
+
+Email processing turns stored emails into jobs and status updates. It runs only when you call it. It is not connected to the scheduler, and this API does not fetch mail from Gmail.
+
+Each row in `emails` has a `kind` (`job_alert` or `application`) and a `status` (`unprocessed`, `processed` or `error`).
+
+Run: `POST /emails/process?limit=10` with the `X-API-Key` header. The limit is 1 to 50 (default 10). The request is synchronous and handles the oldest unprocessed emails first. Each email is its own transaction, so one failure does not stop the others. Only one run can happen at a time; a second request returns 409. The response lists `requested`, `processed`, `jobs_created`, `jobs_duplicate`, `classified`, `auto_status_changed`, `needs_review`, `errored`, `skipped_by_cap`, `stopped_reason` and the `cap`.
+
+Job alerts (`job_alert`): the HTML is read with the Python standard library only. No AI is used and nothing in the email is opened or fetched. Only LinkedIn job links are accepted. Jobs are created with source `linkedin_email`, priority 1, pipeline status `new` and no description, and duplicates are skipped by normalized URL. After a successful parse the stored HTML is cleared. If the layout is not recognized, the email is marked `error` and the HTML is kept so you can inspect it.
+
+Application emails (`application`): only the sender, the subject and a snippet are sent to Groq, each cut to 200 characters. The email body is never sent. Groq must answer with JSON containing only `class` (`confirmation`, `interview`, `assessment`, `info_request`, `rejection`, `offer` or `unknown`) and an integer `confidence` from 0 to 100. Anything else is invalid. Two invalid answers in a row mark the email as `error`. An `unknown` email is marked processed with no class, no notification and no change to any application.
+
+Linking: an email is linked to an application when the job company appears as a whole word in the subject or snippet. Withdrawn applications and company names shorter than 3 characters are ignored. If there is not exactly one match, nothing is linked and an `email_needs_review` notification is created. You can link or unlink by hand with `PATCH /emails/{id}` and body `{"application_id": 1}` or `{"application_id": null}`. This never changes the application status.
+
+Automatic status change: the status changes only when all of these are true:
+
+- `email_auto_status_enabled` is `true`.
+- The email is linked to exactly one application.
+- The sender address matches an enabled allowed sender of kind `application`.
+- `confidence` is at least `email_auto_status_min_confidence`.
+- The change is forward, or a rejection, and the current status is not `rejected`, `offer` or `withdrawn`.
+
+Mapping: `interview` sets `interview`, `assessment` sets `assessment`, `rejection` sets `rejected` and `offer` sets `offer`. `confirmation` never changes the status. `info_request` only creates a review notification. Otherwise a review notification explains the reason and the status is not changed. The change, its history event (source `email`) and the `status_changed` notification are written in one transaction.
+
+Undo: `POST /application-events/{id}/undo` restores the previous status. It works only for events created by an email, only while that event is still the latest event of the application, and only once. The undo is recorded as a new event with source `undo`.
+
+Allowed senders: `GET /allowed-senders`, `POST /allowed-senders` (`sender` as one exact email address and `kind`) and `PATCH /allowed-senders/{id}` (`enabled` only). There is no delete; disable a sender instead.
+
+Reading emails: `GET /emails` supports `kind`, `status`, `class`, `linked`, `limit` and `offset`, newest first. `GET /emails/{id}` returns one email. The stored HTML body is never returned.
+
+Settings: `email_auto_status_enabled` (default `true`), `email_auto_status_min_confidence` (50 to 100, default 85) and `email_classify_daily_cap` (1 to 100, default 30). The cap counts Groq email calls per UTC day and is separate from `daily_score_cap`. When the cap is reached, application emails stay `unprocessed` and job alerts are still processed. Rate limits, Groq outages and bad API keys stop the run and leave the current email `unprocessed`.
+
+Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
+
+    curl -s -X POST -H "X-API-Key: <API_KEY>" "http://127.0.0.1:8000/emails/process?limit=5"
     
 ## Test database
 
