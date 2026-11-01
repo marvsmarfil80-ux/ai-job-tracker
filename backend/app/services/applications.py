@@ -59,19 +59,34 @@ def create_application(db: Session, payload: ApplicationCreate) -> Application:
     return application
 
 
+def change_status(
+    db: Session,
+    application: Application,
+    new_status: str,
+    source: str = "manual",
+    email_id: int | None = None,
+) -> bool:
+    if new_status == application.status:
+        return False
+    previous = application.status
+    application.status = new_status
+    db.flush()
+    db.add(
+        ApplicationEvent(
+            application_id=application.id,
+            from_status=previous,
+            to_status=new_status,
+            source=source,
+            email_id=email_id,
+        )
+    )
+    return True
+
+
 def update_application(db: Session, application: Application, changes: dict) -> None:
     if "notes" in changes:
         application.notes = changes["notes"]
     new_status = changes.get("status")
-    if new_status is not None and new_status != application.status:
-        previous = application.status
-        application.status = new_status
-        db.flush()
-        db.add(
-            ApplicationEvent(
-                application_id=application.id,
-                from_status=previous,
-                to_status=new_status,
-            )
-        )
+    if new_status is not None:
+        change_status(db, application, new_status)
     db.commit()
