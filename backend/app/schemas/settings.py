@@ -27,6 +27,9 @@ class SettingsUpdate(BaseModel):
         default=None, strict=True, ge=50, le=100
     )
     email_classify_daily_cap: int | None = Field(default=None, strict=True, ge=1, le=100)
+    email_sync_lookback_days: int | None = Field(default=None, strict=True, ge=1, le=30)
+    email_sync_timeout_seconds: int | None = Field(default=None, strict=True, ge=60, le=900)
+    email_sync_interval_minutes: int | None = Field(default=None, strict=True, ge=15, le=1440)
 
     @field_validator("title_exclude_regex")
     @classmethod

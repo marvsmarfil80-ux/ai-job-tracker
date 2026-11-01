@@ -40,3 +40,9 @@ INSERT INTO settings (key, value) VALUES
     ('email_auto_status_min_confidence', '85'::jsonb),
     ('email_classify_daily_cap', '30'::jsonb)
 ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO settings (key, value) VALUES
+    ('email_sync_lookback_days', '7'::jsonb),
+    ('email_sync_timeout_seconds', '300'::jsonb),
+    ('email_sync_interval_minutes', '120'::jsonb)
+ON CONFLICT (key) DO NOTHING;

@@ -25,6 +25,9 @@ BASELINE = {
     "email_auto_status_enabled": True,
     "email_auto_status_min_confidence": 85,
     "email_classify_daily_cap": 30,
+    "email_sync_lookback_days": 7,
+    "email_sync_timeout_seconds": 300,
+    "email_sync_interval_minutes": 120,
 }
 PUBLIC_KEYS = sorted(key for key in BASELINE if key != "min_score")
 

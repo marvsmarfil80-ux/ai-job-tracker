@@ -19,6 +19,9 @@ DESCRIPTIONS = {
     "email_auto_status_enabled": "Whether an email may automatically change an application status (false means notification only).",
     "email_auto_status_min_confidence": "Minimum classifier confidence (50 to 100) required for an automatic status change.",
     "email_classify_daily_cap": "Maximum Groq email classification calls per day (UTC day), separate from daily_score_cap.",
+    "email_sync_lookback_days": "Days of Gmail history to read on the very first email sync.",
+    "email_sync_timeout_seconds": "Seconds to wait for the n8n email importer before a sync is marked as failed.",
+    "email_sync_interval_minutes": "Minutes between automatic email syncs (only when scheduler_enabled is true).",
 }
 
 DEFAULTS = {
@@ -33,6 +36,9 @@ DEFAULTS = {
     "email_auto_status_enabled": True,
     "email_auto_status_min_confidence": 85,
     "email_classify_daily_cap": 30,
+    "email_sync_lookback_days": 7,
+    "email_sync_timeout_seconds": 300,
+    "email_sync_interval_minutes": 120,
 }
 
 KEYS = tuple(DESCRIPTIONS)
