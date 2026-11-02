@@ -1,5 +1,5 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -16,8 +16,10 @@ from app.schemas.emails import (
 )
 from app.security import require_api_key
 from app.services.email_processing import run_email_processing
+from app.services.email_sync import finish_sync, start_sync
 from app.services.emails import get_email_item, list_emails
 from app.services.groq_client import get_groq_client
+from app.services.hunts import TRIGGER_MANUAL
 
 router = APIRouter(prefix="/emails", tags=["emails"], dependencies=[Depends(require_api_key)])
 
@@ -31,6 +33,12 @@ def process_emails(
     client: httpx.Client = Depends(get_groq_client),
 ):
     return run_email_processing(db, client, limit)
+
+@router.post("/sync", status_code=202)
+def sync_emails(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    run_id = start_sync(db, TRIGGER_MANUAL)
+    background_tasks.add_task(finish_sync, run_id)
+    return {"run_id": run_id}
 
 
 @router.get("", response_model=EmailList)
