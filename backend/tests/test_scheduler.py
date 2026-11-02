@@ -128,6 +128,7 @@ def scheduler_environment(monkeypatch):
     reset_tables()
     write_settings()
     monkeypatch.setattr(get_settings(), "groq_mock", True)
+    monkeypatch.setattr(scheduler, "email_sync_step", lambda *args, **kwargs: "disabled")
     monkeypatch.setattr("app.services.scoring.get_profile_text", lambda db: PROFILE_MARKER)
     yield
     reset_tables()

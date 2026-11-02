@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.db import SessionLocal
 from app.services.clock import manila_today
 from app.services.feeds import get_feed_client
+from app.services.email_sync import finish_sync, start_sync, stale_check
 from app.services.follow_up_reminders import create_reminder, find_overdue_without_reminder
 from app.services.groq_client import get_groq_client
 from app.services.hunts import TRIGGER_SCHEDULED, run_hunt
@@ -66,7 +67,13 @@ def warn_once(state: SchedulerState, session_factory, now: datetime, level: str,
 
 
 def hunt_is_due(db, now: datetime, hours: int) -> bool:
-    last = db.execute(text("select max(started_at) from search_runs")).scalar_one()
+    last = db.execute(
+        text(
+            "select max(r.started_at) from search_runs r where not exists ("
+            "select 1 from search_run_steps s "
+            "where s.run_id = r.id and s.source = 'email')"
+        )
+    ).scalar_one()
     return last is None or last <= now - timedelta(hours=hours)
 
 
@@ -155,6 +162,47 @@ def reminder_step(now, state, values, session_factory) -> str | int:
                 )
     return created
 
+def email_sync_is_due(db, now: datetime, minutes: int) -> bool:
+    last = db.execute(
+        text(
+            "select max(r.started_at) from search_runs r "
+            "join search_run_steps s on s.run_id = r.id where s.source = 'email'"
+        )
+    ).scalar_one()
+    return last is None or last <= now - timedelta(minutes=minutes)
+
+
+def start_finish_thread(run_id: int) -> None:
+    threading.Thread(
+        target=finish_sync, args=(run_id,), name="email-sync", daemon=True
+    ).start()
+
+
+def email_sync_step(now, state, values, session_factory, finish_starter=start_finish_thread) -> str:
+    with session_factory() as db:
+        stale_check(db, values["email_sync_timeout_seconds"], now)
+        if not email_sync_is_due(db, now, values["email_sync_interval_minutes"]):
+            return "not_due"
+        try:
+            run_id = start_sync(db, TRIGGER_SCHEDULED)
+        except HTTPException as exc:
+            if exc.status_code == 409:
+                return "running"
+            if exc.status_code == 502:
+                return "failed"
+            if exc.status_code == 503:
+                warn_once(
+                    state,
+                    session_factory,
+                    now,
+                    "warning",
+                    f"Scheduled email sync skipped: {exc.detail}",
+                )
+                return "skipped"
+            raise
+    finish_starter(run_id)
+    return "started"
+
 
 def tick(
     now: datetime,
@@ -206,6 +254,17 @@ def tick(
         summary["scoring"] = "error"
         warn_once(
             state, session_factory, now, "error", f"Scheduled scoring failed: {type(exc).__name__}"
+        )
+    try:
+        summary["email_sync"] = email_sync_step(now, state, values, session_factory)
+    except Exception as exc:
+        summary["email_sync"] = "error"
+        warn_once(
+            state,
+            session_factory,
+            now,
+            "error",
+            f"Scheduled email sync failed: {type(exc).__name__}",
         )
     return summary
 
