@@ -33,7 +33,7 @@ Copy both example files and replace the placeholder values:
 
 - `.env` holds PostgreSQL settings only. Docker Compose passes this whole file to the database container.
 - `groq.env` holds the Groq API key. It is never passed to a container.
-- `app.env` holds backend-only secrets (`API_KEY`, `N8N_WRITER_PASSWORD`) and flags. It is git-ignored; see `app.env.example`.
+- `app.env` holds backend-only secrets (`API_KEY`, `N8N_WRITER_PASSWORD`, `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_KEY`) and flags. It is git-ignored; see `app.env.example`. `N8N_WEBHOOK_URL` is the full production URL of the n8n webhook, including the `http://` prefix and the secret path. `N8N_WEBHOOK_KEY` is the value of the webhook header.
 
 All env files are git-ignored. Never commit real credentials.
 
@@ -135,7 +135,7 @@ Example (replace `<API_KEY>` with your own key, and do not paste it anywhere pub
     curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"application_id": 1, "title": "Email the recruiter", "due_date": "2026-11-05"}' http://127.0.0.1:8000/follow-ups
 ## Email processing
 
-Email processing turns stored emails into jobs and status updates. It runs only when you call it. It is not connected to the scheduler, and this API does not fetch mail from Gmail.
+Email processing turns stored emails into jobs and status updates. It runs when you call it, and the email sync (see Email sync) runs it automatically after new emails are saved. This API does not fetch mail from Gmail itself; n8n does.
 
 Each row in `emails` has a `kind` (`job_alert` or `application`) and a `status` (`unprocessed`, `processed` or `error`).
 
@@ -168,6 +168,48 @@ Settings: `email_auto_status_enabled` (default `true`), `email_auto_status_min_c
 Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
 
     curl -s -X POST -H "X-API-Key: <API_KEY>" "http://127.0.0.1:8000/emails/process?limit=5"
+
+## Email sync
+
+Email sync copies new Gmail messages into the `emails` table and then runs email processing on them. n8n only imports emails. Every decision is made by the Python backend.
+
+How it works:
+
+1. `POST /emails/sync` (header `X-API-Key`, no body) creates a row in `search_runs` and a step row with source `email` and status `running`. It then calls the n8n webhook with the run id and a `since` timestamp.
+2. n8n reads the enabled allowed senders, asks Gmail for matching messages newer than `since` (at most 100), and inserts them into `emails` with status `unprocessed`. Messages that are already stored are skipped by `gmail_message_id`. n8n then writes the result (`found`, `new` and a `message`) to the step row and sets its status to `done`.
+3. The backend waits in a background task and checks the step every 5 seconds. When the step is `done`, it runs email processing (up to 100 emails; the Groq daily cap still applies), closes the run and sets `total_new` to the number of new jobs created from LinkedIn job alerts. A `hunt_done` notification is created only when there is at least one new email or one new job.
+
+Responses of `POST /emails/sync`:
+
+- `202` with `{"run_id": 1}`: the sync was started.
+- `401`: missing or wrong API key.
+- `409`: an email sync is already running.
+- `502`: n8n could not be reached or did not answer with a 2xx status.
+- `503`: `N8N_WEBHOOK_URL` or `N8N_WEBHOOK_KEY` is not set.
+
+`since` is the start time of the last email run whose step is `done`, minus 1 hour so that nothing is missed. On the first sync it is now minus `email_sync_lookback_days`. The format is ISO 8601 in UTC.
+
+Errors are never silent. If n8n reports an error, or does not finish within `email_sync_timeout_seconds`, the step and the run are marked `error` and a line is written to `system_events` (component `email_sync`, with no email content). A stale check marks old `running` email syncs as `error` at the start of every sync and every scheduler email tick, for example after the backend restarted while waiting. Emails that stay `unprocessed` are handled by the next run. If email processing is busy (a hunt holds the same lock), the run ends with no new jobs and the emails wait for the next sync.
+
+Settings: `email_sync_lookback_days` (1 to 30, default 7, used only for the first sync), `email_sync_timeout_seconds` (60 to 900, default 300) and `email_sync_interval_minutes` (15 to 1440, default 120).
+
+Scheduler: the `email_sync` job runs every `email_sync_interval_minutes`, only when `scheduler_enabled` is `true`. It waits for n8n in its own thread, so hunts and scoring are not blocked. Email runs do not count for the hunt interval. Email runs are stored in `search_runs`, so they also appear in `GET /hunts`.
+
+Role of n8n and its limits: n8n is only the email importer. It connects to Gmail with a credential that has the `gmail.readonly` scope only, and to PostgreSQL with the limited role `n8n_writer`. That role can:
+
+- read `allowed_senders`;
+- insert into `emails`, but read only the `gmail_message_id` column of it (it cannot read the subject, snippet or HTML, and it cannot read `jobs`);
+- never update or delete `emails`;
+- insert into `system_events` and `search_run_steps`;
+- update only the result columns (`status`, `found`, `new`, `message`) of step rows whose status is still `running` (row-level security).
+
+Only the sender, the subject, a snippet cut to 200 characters and, for job alerts only, the HTML are stored. Set both n8n workflows to not save execution data, so email content is not kept inside n8n.
+
+While the Google OAuth app is in Testing mode, the Gmail refresh token expires about every 7 days, and the Gmail credential in n8n must be reconnected.
+
+Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
+
+    curl -s -X POST -H "X-API-Key: <API_KEY>" http://127.0.0.1:8000/emails/sync
     
 ## Test database
 
