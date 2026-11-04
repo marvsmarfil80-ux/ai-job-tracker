@@ -1,0 +1,54 @@
+{
+  "name": "Email importer error handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b1000001-0000-4000-8000-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO system_events (component, level, run_id, message) VALUES ('n8n_email', 'error', (SELECT run_id FROM search_run_steps WHERE source = 'email' AND status = 'running' ORDER BY id DESC LIMIT 1), $1)",
+        "options": {
+          "queryReplacement": "={{ ['Email importer workflow failed in node ' + ($json.execution.lastNodeExecuted || 'unknown') + '.'] }}"
+        }
+      },
+      "id": "b1000001-0000-4000-8000-000000000002",
+      "name": "Log error event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [260, 0],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE search_run_steps SET status = 'error', message = 'The email importer workflow failed.' WHERE source = 'email' AND status = 'running'",
+        "options": {}
+      },
+      "id": "b1000001-0000-4000-8000-000000000003",
+      "name": "Mark step failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [520, 0]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Log error event", "type": "main", "index": 0 }]]
+    },
+    "Log error event": {
+      "main": [[{ "node": "Mark step failed", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "name": "Email importer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "REPLACE_WITH_WEBHOOK_PATH",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"accepted\": true}",
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000002",
+      "name": "Respond accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT sender, kind FROM allowed_senders WHERE enabled = true",
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000003",
+      "name": "Get allowed senders",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 0],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r.sender && r.kind);\nconst body = $('Webhook').first().json.body || {};\nconst since = new Date(body.since);\nif (isNaN(since.getTime())) { throw new Error('Invalid since value.'); }\nconst valid = rows.filter(r => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$/.test(String(r.sender).trim()));\nif (valid.length === 0) {\n  return [{ json: { skip: true, found: 0, new: 0, message: 'No enabled allowed senders.' } }];\n}\nconst kinds = {};\nfor (const r of valid) {\n  const address = String(r.sender).trim().toLowerCase();\n  if (!kinds[address]) { kinds[address] = r.kind; }\n}\nconst addresses = Object.keys(kinds);\nconst epoch = Math.floor(since.getTime() / 1000);\nconst query = '(' + addresses.map(a => 'from:' + a).join(' OR ') + ') after:' + epoch;\nreturn [{ json: { skip: false, query, kinds } }];"
+      },
+      "id": "a1000001-0000-4000-8000-000000000004",
+      "name": "Build Gmail query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a1",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000005",
+      "name": "Skip Gmail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [960, 0]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 100,
+        "simple": false,
+        "filters": { "q": "={{ $json.query }}" },
+        "options": {}
+      },
+      "id": "a1000001-0000-4000-8000-000000000006",
+      "name": "Get Gmail messages",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1200, 120],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const kinds = $('Build Gmail query').first().json.kinds;\nconst rows = [];\nfunction header(m, name) {\n  const headers = (m.payload && m.payload.headers) || [];\n  const hit = headers.find(h => String(h.name).toLowerCase() === name);\n  return hit ? hit.value : null;\n}\nfunction fromOf(m) {\n  if (typeof m.from === 'string') { return m.from; }\n  if (m.from && m.from.text) { return m.from.text; }\n  return header(m, 'from') || '';\n}\nfunction htmlOf(m) {\n  if (typeof m.html === 'string') { return m.html; }\n  const walk = (part) => {\n    if (!part) { return null; }\n    if (part.mimeType === 'text/html' && part.body && part.body.data) {\n      return Buffer.from(part.body.data, 'base64').toString('utf8');\n    }\n    for (const child of part.parts || []) {\n      const found = walk(child);\n      if (found) { return found; }\n    }\n    return null;\n  };\n  return walk(m.payload);\n}\nfor (const item of $input.all()) {\n  const m = item.json;\n  if (!m || !m.id) { continue; }\n  const from = fromOf(m);\n  const match = from.match(/<([^>]+)>/);\n  const address = (match ? match[1] : from).trim().toLowerCase();\n  const kind = kinds[address];\n  if (!kind) { continue; }\n  const received = m.internalDate ? new Date(Number(m.internalDate)) : new Date(m.date);\n  if (isNaN(received.getTime())) { throw new Error('Message has no usable date.'); }\n  rows.push({\n    gmail_message_id: String(m.id),\n    kind: kind,\n    sender: from,\n    subject: m.subject || header(m, 'subject') || null,\n    snippet: String(m.snippet || '').slice(0, 200) || null,\n    body_html: kind === 'job_alert' ? (htmlOf(m) || null) : null,\n    received_at: received.toISOString()\n  });\n}\nreturn [{ json: { rows } }];"
+      },
+      "id": "a1000001-0000-4000-8000-000000000007",
+      "name": "Map messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO emails (gmail_message_id, kind, sender, subject, snippet, body_html, received_at, status) SELECT r.gmail_message_id, r.kind, r.sender, r.subject, r.snippet, r.body_html, r.received_at, 'unprocessed' FROM jsonb_to_recordset($1::jsonb) AS r(gmail_message_id text, kind text, sender text, subject text, snippet text, body_html text, received_at timestamptz) ON CONFLICT (gmail_message_id) DO NOTHING RETURNING 1",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json.rows)] }}"
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000008",
+      "name": "Insert emails",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1680, 120],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const found = $('Get Gmail messages').all().filter(i => i.json && i.json.id).length;\nconst inserted = $input.all().filter(i => i.json && i.json['?column?'] === 1).length;\nlet message = 'Gmail returned ' + found + ' messages; ' + inserted + ' new emails saved.';\nif (found >= 100) { message += ' Limit of 100 reached; older messages may remain.'; }\nreturn [{ json: { found: found, new: inserted, message: message } }];"
+      },
+      "id": "a1000001-0000-4000-8000-000000000009",
+      "name": "Build result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, 120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE search_run_steps SET status = 'done', found = $1, \"new\" = $2, message = $3 WHERE run_id = $4 AND source = 'email'",
+        "options": {
+          "queryReplacement": "={{ [$json.found, $json.new, $json.message, $('Webhook').first().json.body.run_id] }}"
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000010",
+      "name": "Save step result",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2160, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Respond accepted", "type": "main", "index": 0 }]]
+    },
+    "Respond accepted": {
+      "main": [[{ "node": "Get allowed senders", "type": "main", "index": 0 }]]
+    },
+    "Get allowed senders": {
+      "main": [[{ "node": "Build Gmail query", "type": "main", "index": 0 }]]
+    },
+    "Build Gmail query": {
+      "main": [[{ "node": "Skip Gmail?", "type": "main", "index": 0 }]]
+    },
+    "Skip Gmail?": {
+      "main": [
+        [{ "node": "Save step result", "type": "main", "index": 0 }],
+        [{ "node": "Get Gmail messages", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Gmail messages": {
+      "main": [[{ "node": "Map messages", "type": "main", "index": 0 }]]
+    },
+    "Map messages": {
+      "main": [[{ "node": "Insert emails", "type": "main", "index": 0 }]]
+    },
+    "Insert emails": {
+      "main": [[{ "node": "Build result", "type": "main", "index": 0 }]]
+    },
+    "Build result": {
+      "main": [[{ "node": "Save step result", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}
