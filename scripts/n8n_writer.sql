@@ -20,7 +20,7 @@ GRANT INSERT ON emails TO n8n_writer;
 GRANT SELECT (gmail_message_id) ON emails TO n8n_writer;
 GRANT INSERT ON system_events TO n8n_writer;
 GRANT INSERT ON search_run_steps TO n8n_writer;
-GRANT SELECT (id) ON search_run_steps TO n8n_writer;
+GRANT SELECT (id, run_id, source, status) ON search_run_steps TO n8n_writer;
 GRANT UPDATE (status, found, "new", message) ON search_run_steps TO n8n_writer;
 
 ALTER TABLE search_run_steps ENABLE ROW LEVEL SECURITY;
