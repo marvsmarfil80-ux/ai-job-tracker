@@ -25,7 +25,7 @@ DESCRIPTIONS = {
 }
 
 DEFAULTS = {
-    "daily_score_cap": 150,
+    "daily_score_cap": 100,
     "apply_threshold": 70,
     "maybe_threshold": 40,
     "scheduler_enabled": False,

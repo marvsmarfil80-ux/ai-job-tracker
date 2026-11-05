@@ -36,6 +36,7 @@ Copy both example files and replace the placeholder values:
 - `app.env` holds backend-only secrets (`API_KEY`, `N8N_WRITER_PASSWORD`, `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_KEY`) and flags. It is git-ignored; see `app.env.example`. `N8N_WEBHOOK_URL` is the full production URL of the n8n webhook, including the `http://` prefix and the secret path. `N8N_WEBHOOK_KEY` is the value of the webhook header.
 
 All env files are git-ignored. Never commit real credentials.
+Settings are read once when the API starts. After you edit any env file (for example `app.env`), restart the API for the change to take effect.
 
 Setup and usage instructions will be added as the backend is built.
 
@@ -210,6 +211,41 @@ While the Google OAuth app is in Testing mode, the Gmail refresh token expires a
 Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
 
     curl -s -X POST -H "X-API-Key: <API_KEY>" http://127.0.0.1:8000/emails/sync
+
+## System status
+
+`GET /system/status` (header `X-API-Key`) is a read-only health report. Every field is calculated on each request. Nothing is cached or stored, nothing is written to the database, no notification is created and Groq is never called.
+
+Response fields:
+
+- `status`: `ok` when `database` is `ok` and `n8n` is `ok` or `not_configured`. Otherwise `degraded`.
+- `checked_at`: the time of the check (ISO 8601, UTC).
+- `database`: `status` (`ok` or `error`) and `schema_version` (the Alembic revision id only).
+- `groq`: `api_key_configured` (true or false) and `mock_mode`. The key itself is never returned.
+- `n8n`: `status` (`ok`, `error` or `not_configured`) and `http_status`.
+- `email_sync`: `last_run_id`, `last_run_status` (`running`, `done` or `error`), `last_run_finished_at` and `last_successful_run_at`.
+- `profile`: `is_set` (true when the profile text is not empty). The text is never returned.
+- `scheduler`: `enabled` and `followup_reminders_enabled`, read from the settings.
+
+If the database cannot be reached, the whole endpoint returns `503` with `{"detail": "Database is unreachable."}`. A failure in any other check does not break the endpoint. A missing or wrong API key returns `401`.
+
+n8n check: the backend takes only the scheme, host and port from `N8N_WEBHOOK_URL` and discards the path. It calls `GET /healthz` only when the host is `127.0.0.1`, `localhost` or `::1`; any other host gives `error` without a call. The timeout is 3 seconds and redirects are not followed. The URL, the path and any error text are never returned or logged.
+
+Gmail: the Gmail credential is held by n8n, so the Python backend cannot check it directly. The `email_sync` block takes its place. If `last_run_status` is `error`, or `last_successful_run_at` is older than expected, check n8n and reconnect the Gmail credential there. An email run is a row in `search_runs` that has a step with source `email`.
+
+Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
+
+    curl -s -H "X-API-Key: <API_KEY>" http://127.0.0.1:8000/system/status
+
+## Orphaned runs at startup
+
+If the API stops while a run is in progress, the run would stay `running` forever. The API uses one worker, so any run that is still `running` when the API starts was interrupted. At startup, before the scheduler thread starts, the backend closes every such run:
+
+- The run becomes `error` and gets a `finished_at`.
+- Each of its steps that is still `running` becomes `error` with the message `Interrupted by a restart.`. Steps that are `done`, `error` or `skipped` are not changed.
+- One line is written to `system_events` (component `startup`, level `warning`, message `Closed N orphaned run(s) at startup.`). Nothing is written when there is nothing to close. No notification is created.
+
+If this cleanup fails, the API still starts.
     
 ## Test database
 

@@ -1,3 +1,5 @@
+import logging
+
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -19,15 +21,22 @@ from app.routers.profile import router as profile_router
 from app.routers.score import router as score_router
 from app.routers.settings import router as settings_router
 from app.routers.sources import router as sources_router
+from app.routers.system_status import router as system_status_router
+from app.services.orphan_runs import close_orphan_runs
 from app.services.scheduler import SchedulerThread
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     scheduler = None
     if settings.scheduler_thread_enabled:
+        try:
+            close_orphan_runs()
+        except Exception as exc:
+            logger.warning("Could not close orphaned runs at startup: %s", type(exc).__name__)
         scheduler = SchedulerThread()
         scheduler.start()
     try:
@@ -48,7 +57,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["X-API-Key", "Content-Type"],
 )
 
@@ -64,6 +73,7 @@ app.include_router(follow_ups_router)
 app.include_router(emails_router)
 app.include_router(allowed_senders_router)
 app.include_router(application_events_router)
+app.include_router(system_status_router)
 
 
 @app.get("/health")
