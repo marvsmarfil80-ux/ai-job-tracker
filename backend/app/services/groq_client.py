@@ -15,6 +15,8 @@ MAX_RETRY_AFTER_SECONDS = 60.0
 DEFAULT_RETRY_AFTER_SECONDS = 20.0
 TRANSIENT_SLEEP_SECONDS = 2.0
 MOCK_CONTENT = json.dumps({"score": 55, "reason": "Mock score", "red_flags": []})
+MOCK_EMAIL_CONTENT = json.dumps({"class": "interview", "confidence": 90})
+EMAIL_REQUEST_MARKER = "email_metadata"
 
 
 class GroqError(Exception):
@@ -123,10 +125,12 @@ def call_groq(
 
 
 def mock_handler(request: httpx.Request) -> httpx.Response:
+    body = request.content.decode("utf-8", errors="replace")
+    content = MOCK_EMAIL_CONTENT if EMAIL_REQUEST_MARKER in body else MOCK_CONTENT
     return httpx.Response(
         200,
         json={
-            "choices": [{"message": {"content": MOCK_CONTENT}, "finish_reason": "stop"}],
+            "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
             "usage": {"total_tokens": 100},
         },
     )
