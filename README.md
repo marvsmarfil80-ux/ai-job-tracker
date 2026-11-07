@@ -1,48 +1,192 @@
 # AI Job Tracker
 
-A personal web app that automatically searches for remote jobs, tracks job applications, and monitors job-related Gmail messages.
+A personal web app that automatically searches for remote jobs (as far as each site allows), tracks job applications, and monitors job-related Gmail messages. It is built for personal use and as a portfolio project.
 
-> **Status:** Early development. Repository setup phase.
+> **Status:** The backend is complete through phase P10c. The frontend is postponed. There is no UI yet: use `curl`, `psql` and `pytest`.
 
-## Design Principles
+## Hard rules
 
-- **No auto-submit.** The app never submits a job application on your behalf.
-- **Gmail is read-only.** The app only reads job-related messages and never sends, modifies, or deletes email.
-- **No secrets in the repository.** Credentials live in local `.env` files that are git-ignored. See `.env.example` for the required variable names.
+- **No auto-submit.** The app never submits a job application. Opening a listing does not mean "applied". The app asks "Did you apply?" and only you confirm.
+- **Gmail is read-only.** The Gmail credential has the `gmail.readonly` scope only. Only allowlisted senders (exact email addresses) are read. Original emails are never changed.
+- **The AI sees very little.** For emails, only the subject, the sender and a snippet of at most 200 characters can go to the AI. The email body never does.
+- **The AI never takes actions and never invents facts.** It only uses your stored profile. The code decides everything.
+- **In-app notifications only.** Follow-ups are a simple to-do list.
+- **No secrets in the repository.** Credentials live in git-ignored env files.
 - **Zero-cost tooling.** Only free tools and services are used.
 
-## Planned Stack
+## Architecture
 
-- Backend: Python, FastAPI, PostgreSQL, Alembic
-- Frontend: to be added
-- Chrome extension: to be added
+Stack: Python, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL, Groq free tier (`openai/gpt-oss-20b`). n8n is used as the email importer only.
 
-## Repository Layout
+n8n has no business logic. It does not call the API back. It uses its own limited database role (`n8n_writer`) and a Gmail credential that can only read.
 
-- `backend/` - API and database code
-- `scripts/` - helper scripts
-- `docs/` - documentation
+```mermaid
+flowchart LR
+    API["FastAPI backend"]
+    N8N["n8n email importer"]
+    PG[("PostgreSQL")]
+    GM["Gmail (gmail.readonly)"]
+    GQ["Groq"]
 
-## Configuration
+    API -->|"1. POST webhook with X-Webhook-Key: run_id and since"| N8N
+    N8N -.->|"2. accepted: true"| API
+    N8N -->|"3. read enabled allowed_senders as role n8n_writer"| PG
+    N8N -->|"4. ask for messages from allowed senders"| GM
+    N8N -->|"5. INSERT into emails, ON CONFLICT DO NOTHING, then save step result"| PG
+    API -->|"6. wait for the step, then process emails"| PG
+    API -->|"7. subject, sender and snippet of up to 200 characters only"| GQ
+```
 
-Copy both example files and replace the placeholder values:
+The role `n8n_writer` cannot read `jobs`, cannot read the subject, snippet or HTML of `emails`, and cannot update or delete `emails`. Both n8n workflows are exported with execution data saving turned off.
 
-    cp .env.example .env
-    cp groq.env.example groq.env
-    chmod 600 .env groq.env
+## Getting jobs
 
-- `.env` holds PostgreSQL settings only. Docker Compose passes this whole file to the database container.
-- `groq.env` holds the Groq API key. It is never passed to a container.
-- `app.env` holds backend-only secrets (`API_KEY`, `N8N_WRITER_PASSWORD`, `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_KEY`) and flags. It is git-ignored; see `app.env.example`. `N8N_WEBHOOK_URL` is the full production URL of the n8n webhook, including the `http://` prefix and the secret path. `N8N_WEBHOOK_KEY` is the value of the webhook header.
+What is built and what is not:
 
-All env files are git-ignored. Never commit real credentials.
-Settings are read once when the API starts. After you edit any env file (for example `app.env`), restart the API for the change to take effect.
+| Way | Status |
+| --- | --- |
+| Job feeds (We Work Remotely, RemoteOK, Remotive) | Built |
+| LinkedIn job-alert emails (through email sync) | Built |
+| Manual `POST /jobs` (source `manual`, API only) | Built |
+| "+ Add Job" form | Planned only (the frontend is postponed) |
+| Chrome extension | Planned only (`extension` is an accepted source value, but no extension exists) |
 
-Setup and usage instructions will be added as the backend is built.
+Feeds in the code:
+
+- `weworkremotely`: the customer support category RSS feed only.
+- `remoteok`: the RemoteOK API.
+- `remotive`: the Remotive API. See "Sources and attribution".
+
+## Repository layout
+
+- `backend/` - FastAPI app, models, services, Alembic migrations, tests
+- `scripts/` - `seed.sql`, `set_profile.py`, `n8n_writer.sql`, `smoke_api.sh`, `smoke.sh`, `backup_check.sh`
+- `n8n/` - the two exported n8n workflows
+- `docker-compose.yml` - the PostgreSQL container
+- `n8n-compose.yml` - the n8n container
+- `PRIVACY.md` - privacy policy
+- `docs/` - empty placeholder
+
+## Setup
+
+Env files (all git-ignored; the `.example` files list the variable names):
+
+| File | Contents |
+| --- | --- |
+| `.env` | PostgreSQL settings only: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. Docker Compose passes this whole file to the database container. |
+| `groq.env` | `GROQ_API_KEY` only. Never passed to a container. |
+| `app.env` | Backend-only values: `API_KEY`, `N8N_WRITER_PASSWORD`, `GROQ_MOCK`, `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_KEY`. |
+| `n8n.env` | n8n container settings, including `N8N_ENCRYPTION_KEY`. Keep a backup of that key in a password manager. |
+| `n8n-webhook.env` | Optional local reference copy of the webhook path and key for n8n setup. Git-ignored and not read by the app. |
+
+`N8N_WEBHOOK_URL` is the full production URL of the n8n webhook, including `http://` and the secret path. `N8N_WEBHOOK_KEY` is the value of the webhook header. Never commit real values or paste them anywhere public.
+
+Create the env files and install the backend:
+
+```bash
+cp .env.example .env
+cp groq.env.example groq.env
+cp app.env.example app.env
+cp n8n.env.example n8n.env
+chmod 600 .env groq.env app.env n8n.env
+python3 -m venv backend/.venv
+source backend/.venv/bin/activate
+pip install -r backend/requirements.txt
+```
+
+Database and API (from the repository root):
+
+```bash
+sudo docker start jobtracker-postgres
+cd backend
+source .venv/bin/activate
+alembic upgrade head
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+```
+
+Use `--workers 1`. The scheduler and the orphaned-run cleanup assume a single worker. Settings are read once when the API starts, so restart the API after editing any env file. Run migrations on the real database with plain `alembic upgrade head`. Do not run downgrades on the real database.
+
+Default data: `scripts/seed.sql` inserts the sources, default settings, an empty profile row and a starter allowed sender. It is safe to run again.
+
+The limited n8n role: `scripts/n8n_writer.sql` creates the role `n8n_writer` and its grants. It reads the password from the `N8N_WRITER_PASSWORD` environment variable of the `psql` process (`\getenv`). It is not part of Alembic. Run it again after any database rebuild.
+
+n8n (email importer only):
+
+1. Start the container defined in `n8n-compose.yml` (it listens on `127.0.0.1:5679` only).
+2. Import both workflows from `n8n/`. The exports contain a placeholder webhook path and no credential ids, so some manual setup is needed after import.
+3. Create the credentials in n8n: a PostgreSQL credential for the role `n8n_writer`, a Gmail OAuth2 credential with the `gmail.readonly` scope only, and a Header Auth credential for the webhook (header name `X-Webhook-Key`).
+4. Set the real webhook path in the Webhook node and attach the error handler workflow to the importer in its workflow settings (the exported JSON has no link between them).
+5. Publish the importer, then put the production webhook URL and key in `app.env` and restart the API.
+
+Gmail OAuth app: the Google OAuth app is set to "In production" and has not been submitted for Google verification. Whether the Gmail refresh token still expires after about 7 days is **not yet verified**. If email sync starts failing, check the Gmail credential in n8n.
+
+API docs pages are disabled (`/docs`, `/redoc` and `/openapi.json` return nothing). Every endpoint except `GET /health` needs the `X-API-Key` header and returns `401` with `Invalid or missing API key` otherwise.
+
+## Settings
+
+Environment variables with defaults (optional):
+
+| Variable | Default |
+| --- | --- |
+| `POSTGRES_HOST` | `127.0.0.1` |
+| `POSTGRES_PORT` | `5433` |
+| `GROQ_MODEL` | `openai/gpt-oss-20b` |
+| `GROQ_REASONING_EFFORT` | `low` |
+| `SCORE_INTERVAL_SECONDS` | `12.0` |
+| `SCHEDULER_THREAD_ENABLED` | `true` |
+| `CORS_ORIGINS` | `["http://localhost:5173", "http://127.0.0.1:5173"]` (a JSON list) |
+| `GROQ_MOCK` | `false` |
+
+Runtime settings are stored in the database and changed with `PATCH /settings`:
+
+| Key | Default |
+| --- | --- |
+| `scheduler_enabled` | `false` |
+| `hunt_interval_hours` | `6` |
+| `score_interval_minutes` | `30` |
+| `score_batch_limit` | `10` |
+| `daily_score_cap` | `100` |
+| `apply_threshold` | `70` |
+| `maybe_threshold` | `40` |
+| `followup_reminders_enabled` | `true` |
+| `email_auto_status_enabled` | `true` |
+| `email_auto_status_min_confidence` | `85` |
+| `email_classify_daily_cap` | `30` |
+| `email_sync_lookback_days` | `7` |
+| `email_sync_timeout_seconds` | `300` |
+| `email_sync_interval_minutes` | `120` |
+
+`title_exclude_regex` and `title_include_keywords` also exist as settings and control the title filter before scoring.
+
+## Scheduler
+
+The scheduler is **off by default** (`scheduler_enabled` is `false`). When it is on, it runs hunts, scoring and email sync on their intervals. Follow-up reminders only use the database, so they run even when `scheduler_enabled` is `false`.
+
+There are two separate switches. `SCHEDULER_THREAD_ENABLED` (environment variable, default `true`) decides whether the scheduler thread and the startup cleanup exist at all. `scheduler_enabled` (database setting) decides whether hunts, scoring and email sync actually run.
+
+## API overview
+
+All endpoints need `X-API-Key`, except `GET /health` (returns `{"status": "ok"}`, or `503` when the database is unreachable).
+
+| Area | Endpoints |
+| --- | --- |
+| Jobs | `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}`, `POST /jobs/{id}/open` |
+| Hunts | `POST /hunts`, `GET /hunts`, `GET /hunts/{id}` |
+| Sources | `GET /sources`, `PATCH /sources/{id}` |
+| Scoring | `POST /score/run` |
+| Settings | `GET /settings`, `PATCH /settings` |
+| Notifications | `GET /notifications`, `PATCH /notifications/{id}` |
+| Profile | `GET /profile`, `PUT /profile` |
+| Applications | `POST /applications`, `GET /applications`, `GET /applications/{id}`, `PATCH /applications/{id}` |
+| Application events | `POST /application-events/{id}/undo` |
+| Follow-ups | `POST /follow-ups`, `GET /follow-ups`, `GET /follow-ups/{id}`, `PATCH /follow-ups/{id}`, `DELETE /follow-ups/{id}` |
+| Emails | `POST /emails/process`, `POST /emails/sync`, `GET /emails`, `GET /emails/{id}`, `PATCH /emails/{id}` |
+| Allowed senders | `GET /allowed-senders`, `POST /allowed-senders`, `PATCH /allowed-senders/{id}` |
+| System | `GET /system/status` |
 
 ## Profile
 
-The candidate profile is stored in the database (table `profile`, single row). Scoring reads only the database.
+The candidate profile is stored in the database (table `profile`, single row). Scoring reads only the database. The AI uses only this profile and never invents skills or experience.
 
 Setup:
 
@@ -50,19 +194,15 @@ Setup:
 2. Start the API server.
 3. From the repository root, with the backend virtual environment active, run:
 
-       source backend/.venv/bin/activate
-       python scripts/set_profile.py
+```bash
+source backend/.venv/bin/activate
+python scripts/set_profile.py
+```
 
 The script sends the draft to `PUT /profile` and prints only the status code, character count, redaction counts and warnings. It never prints the API key or the profile text.
 
-Endpoints (all require the `X-API-Key` header):
-
 - `GET /profile` returns `content`, `updated_at`, `char_count`, `groq_view`, `redactions` and `warnings`. An empty profile returns 200 with empty content.
 - `PUT /profile` with body `{"content": "<text>"}` replaces the whole profile. The text must be 1 to 2000 characters after trimming and must not contain NUL characters. There is no PATCH or DELETE; to reset, send a new PUT.
-
-Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
-
-    curl -s -H "X-API-Key: <API_KEY>" http://127.0.0.1:8000/profile
 
 Sanitizing: the stored text is exactly what you saved. Only the sanitized text (`groq_view`) is sent to Groq.
 
@@ -72,21 +212,17 @@ Sanitizing: the stored text is exactly what you saved. Only the sanitized text (
 - URLs are kept.
 - Addresses cannot be detected reliably. If the text contains words such as street, barangay or city, the response includes a warning. The text is not changed, so remove the address yourself.
 
-Check `groq_view` after every save to confirm what will be sent to Groq.
-
-If the profile is empty (or empty after sanitizing), scoring does not run and the API returns an error starting with `Profile is not set`.
-
-Changing the profile does not re-score jobs that already have a score for the current prompt version. Only new jobs are scored with the new profile.
+Check `groq_view` after every save to confirm what will be sent to Groq. If the profile is empty (or empty after sanitizing), scoring does not run and the API returns an error starting with `Profile is not set`. Changing the profile does not re-score jobs that already have a score for the current prompt version. Only new jobs are scored with the new profile.
 
 ## Scoring
 
-Jobs that pass the title filter are scored from 0 to 100 by Groq (openai/gpt-oss-20b) against the sanitized candidate profile stored in the database (see Profile).
+Jobs that pass the title filter are scored from 0 to 100 by Groq (`openai/gpt-oss-20b`) against the sanitized profile.
 
-Run: POST /score/run?limit=5 with the X-API-Key header. The limit is 1 to 20 (default 5). The request is synchronous, runs the title filter first, and scores high-priority and newest jobs first.
+Run: `POST /score/run?limit=5` with the `X-API-Key` header. The limit is 1 to 20 (default 5). The request is synchronous, runs the title filter first, and scores high-priority and newest jobs first.
 
-Daily cap: the settings key daily_score_cap limits Groq calls per UTC day. Stored scores and failed calls both count toward it.
+Daily cap: the setting `daily_score_cap` limits Groq calls per UTC day. Stored scores and failed calls both count toward it.
 
-Stop reasons: daily_cap_reached, rate_limited, groq_unavailable, groq_auth_error.
+Stop reasons: `daily_cap_reached`, `rate_limited`, `groq_unavailable`, `groq_auth_error`.
 
 ## Applications
 
@@ -98,7 +234,7 @@ Applications are created only by you. The app never submits an application and n
 2. `GET /jobs?awaiting_apply=true` lists jobs that were opened and have no application yet. `awaiting_apply=false` returns all other jobs. Without the parameter, the list behaves as before.
 3. If you applied, call `POST /applications`. If you did not, nothing is recorded.
 
-Endpoints (all require the `X-API-Key` header):
+Endpoints:
 
 - `POST /applications` with body `{"job_id": 1, "applied_at": "<ISO 8601 with timezone>", "notes": "<text>"}`. Only `job_id` is required. The status is set to `applied` and the first history event is written. `applied_at` defaults to now and cannot be more than 1 day in the future. `notes` can have up to 2000 characters. A job in any pipeline status is accepted. A second application for the same job returns 409 with `existing_id`.
 - `GET /applications` supports `status`, `job_id`, `q` (searches job title and company), `limit` (default 50, maximum 200) and `offset`. The newest `applied_at` comes first. Each item includes a summary of its job.
@@ -111,13 +247,13 @@ Not available yet: deleting an application (use `withdrawn` instead) and a "dism
 
 Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
 
-    curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"job_id": 1, "notes": "Applied on the company site"}' http://127.0.0.1:8000/applications
+```bash
+curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"job_id": 1, "notes": "Applied on the company site"}' http://127.0.0.1:8000/applications
+```
 
 ## Follow-ups and overdue reminders
 
 A follow-up is a simple to-do item attached to one application. It has a title, an optional due date and a status (`pending` or `completed`). The server sets `completed_at` when a follow-up becomes `completed` and clears it when it goes back to `pending`.
-
-Endpoints (all require the `X-API-Key` header):
 
 - `POST /follow-ups` creates a follow-up (`application_id`, `title`, optional `due_date` as `YYYY-MM-DD`).
 - `GET /follow-ups` lists follow-ups. Filters: `status`, `application_id`, `overdue`, `limit`, `offset`.
@@ -129,11 +265,8 @@ A follow-up is overdue when it is pending and its due date is before today in th
 
 Reminders: the scheduler checks for overdue follow-ups on its first tick after startup and then at most once per hour. Each overdue follow-up gets one in-app notification of type `follow_up_overdue` with the link `/follow-ups/{id}`. A follow-up is not notified again unless its due date is moved later and passes again. Completed follow-ups and follow-ups without a due date never notify. Follow-ups on rejected or withdrawn applications do not create new reminders. Notifications that already exist are kept.
 
-The setting `followup_reminders_enabled` (default `true`) turns reminders on or off. Reminders only use the database, so they run even when `scheduler_enabled` is `false`. Hunts and scoring still run only when `scheduler_enabled` is `true`.
+The setting `followup_reminders_enabled` (default `true`) turns reminders on or off.
 
-Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
-
-    curl -s -X POST -H "X-API-Key: <API_KEY>" -H "Content-Type: application/json" -d '{"application_id": 1, "title": "Email the recruiter", "due_date": "2026-11-05"}' http://127.0.0.1:8000/follow-ups
 ## Email processing
 
 Email processing turns stored emails into jobs and status updates. It runs when you call it, and the email sync (see Email sync) runs it automatically after new emails are saved. This API does not fetch mail from Gmail itself; n8n does.
@@ -164,19 +297,13 @@ Allowed senders: `GET /allowed-senders`, `POST /allowed-senders` (`sender` as on
 
 Reading emails: `GET /emails` supports `kind`, `status`, `class`, `linked`, `limit` and `offset`, newest first. `GET /emails/{id}` returns one email. The stored HTML body is never returned.
 
-Settings: `email_auto_status_enabled` (default `true`), `email_auto_status_min_confidence` (50 to 100, default 85) and `email_classify_daily_cap` (1 to 100, default 30). The cap counts Groq email calls per UTC day and is separate from `daily_score_cap`. When the cap is reached, application emails stay `unprocessed` and job alerts are still processed. Rate limits, Groq outages and bad API keys stop the run and leave the current email `unprocessed`.
-
-Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
-
-    curl -s -X POST -H "X-API-Key: <API_KEY>" "http://127.0.0.1:8000/emails/process?limit=5"
+When the daily cap `email_classify_daily_cap` is reached, application emails stay `unprocessed` and job alerts are still processed. The cap counts Groq email calls per UTC day and is separate from `daily_score_cap`. Rate limits, Groq outages and bad API keys stop the run and leave the current email `unprocessed`.
 
 ## Email sync
 
 Email sync copies new Gmail messages into the `emails` table and then runs email processing on them. n8n only imports emails. Every decision is made by the Python backend.
 
-How it works:
-
-1. `POST /emails/sync` (header `X-API-Key`, no body) creates a row in `search_runs` and a step row with source `email` and status `running`. It then calls the n8n webhook with the run id and a `since` timestamp.
+1. `POST /emails/sync` (header `X-API-Key`, no body) creates a row in `search_runs` and a step row with source `email` and status `running`. It then calls the n8n webhook (header `X-Webhook-Key`, 10 second timeout) with the run id and a `since` timestamp.
 2. n8n reads the enabled allowed senders, asks Gmail for matching messages newer than `since` (at most 100), and inserts them into `emails` with status `unprocessed`. Messages that are already stored are skipped by `gmail_message_id`. n8n then writes the result (`found`, `new` and a `message`) to the step row and sets its status to `done`.
 3. The backend waits in a background task and checks the step every 5 seconds. When the step is `done`, it runs email processing (up to 100 emails; the Groq daily cap still applies), closes the run and sets `total_new` to the number of new jobs created from LinkedIn job alerts. A `hunt_done` notification is created only when there is at least one new email or one new job.
 
@@ -192,77 +319,168 @@ Responses of `POST /emails/sync`:
 
 Errors are never silent. If n8n reports an error, or does not finish within `email_sync_timeout_seconds`, the step and the run are marked `error` and a line is written to `system_events` (component `email_sync`, with no email content). A stale check marks old `running` email syncs as `error` at the start of every sync and every scheduler email tick, for example after the backend restarted while waiting. Emails that stay `unprocessed` are handled by the next run. If email processing is busy (a hunt holds the same lock), the run ends with no new jobs and the emails wait for the next sync.
 
-Settings: `email_sync_lookback_days` (1 to 30, default 7, used only for the first sync), `email_sync_timeout_seconds` (60 to 900, default 300) and `email_sync_interval_minutes` (15 to 1440, default 120).
+Scheduler: the email sync job runs every `email_sync_interval_minutes`, only when `scheduler_enabled` is `true`. It waits for n8n in its own thread, so hunts and scoring are not blocked. Email runs are stored in `search_runs`, so they also appear in `GET /hunts`.
 
-Scheduler: the `email_sync` job runs every `email_sync_interval_minutes`, only when `scheduler_enabled` is `true`. It waits for n8n in its own thread, so hunts and scoring are not blocked. Email runs do not count for the hunt interval. Email runs are stored in `search_runs`, so they also appear in `GET /hunts`.
-
-Role of n8n and its limits: n8n is only the email importer. It connects to Gmail with a credential that has the `gmail.readonly` scope only, and to PostgreSQL with the limited role `n8n_writer`. That role can:
+What n8n can do: the role `n8n_writer` can
 
 - read `allowed_senders`;
-- insert into `emails`, but read only the `gmail_message_id` column of it (it cannot read the subject, snippet or HTML, and it cannot read `jobs`);
+- insert into `emails`, but read only the `gmail_message_id` column of it;
 - never update or delete `emails`;
 - insert into `system_events` and `search_run_steps`;
 - update only the result columns (`status`, `found`, `new`, `message`) of step rows whose status is still `running` (row-level security).
 
-Only the sender, the subject, a snippet cut to 200 characters and, for job alerts only, the HTML are stored. Set both n8n workflows to not save execution data, so email content is not kept inside n8n.
-
-While the Google OAuth app is in Testing mode, the Gmail refresh token expires about every 7 days, and the Gmail credential in n8n must be reconnected.
-
-Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
-
-    curl -s -X POST -H "X-API-Key: <API_KEY>" http://127.0.0.1:8000/emails/sync
+Only the sender, the subject, a snippet cut to 200 characters and, for job alerts only, the HTML are stored.
 
 ## System status
 
-`GET /system/status` (header `X-API-Key`) is a read-only health report. Every field is calculated on each request. Nothing is cached or stored, nothing is written to the database, no notification is created and Groq is never called.
-
-Response fields:
+`GET /system/status` is a read-only health report. Every field is calculated on each request. Nothing is cached or stored, nothing is written to the database, no notification is created and Groq is never called.
 
 - `status`: `ok` when `database` is `ok` and `n8n` is `ok` or `not_configured`. Otherwise `degraded`.
 - `checked_at`: the time of the check (ISO 8601, UTC).
 - `database`: `status` (`ok` or `error`) and `schema_version` (the Alembic revision id only).
 - `groq`: `api_key_configured` (true or false) and `mock_mode`. The key itself is never returned.
 - `n8n`: `status` (`ok`, `error` or `not_configured`) and `http_status`.
-- `email_sync`: `last_run_id`, `last_run_status` (`running`, `done` or `error`), `last_run_finished_at` and `last_successful_run_at`.
-- `profile`: `is_set` (true when the profile text is not empty). The text is never returned.
+- `email_sync`: `last_run_id`, `last_run_status`, `last_run_finished_at` and `last_successful_run_at`.
+- `profile`: `is_set`. The text is never returned.
 - `scheduler`: `enabled` and `followup_reminders_enabled`, read from the settings.
 
-If the database cannot be reached, the whole endpoint returns `503` with `{"detail": "Database is unreachable."}`. A failure in any other check does not break the endpoint. A missing or wrong API key returns `401`.
+If the database cannot be reached, the endpoint returns `503` with `{"detail": "Database is unreachable."}`. A failure in any other check does not break the endpoint.
 
 n8n check: the backend takes only the scheme, host and port from `N8N_WEBHOOK_URL` and discards the path. It calls `GET /healthz` only when the host is `127.0.0.1`, `localhost` or `::1`; any other host gives `error` without a call. The timeout is 3 seconds and redirects are not followed. The URL, the path and any error text are never returned or logged.
 
-Gmail: the Gmail credential is held by n8n, so the Python backend cannot check it directly. The `email_sync` block takes its place. If `last_run_status` is `error`, or `last_successful_run_at` is older than expected, check n8n and reconnect the Gmail credential there. An email run is a row in `search_runs` that has a step with source `email`.
-
-Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
-
-    curl -s -H "X-API-Key: <API_KEY>" http://127.0.0.1:8000/system/status
+Gmail: the Gmail credential is held by n8n, so the Python backend cannot check it directly. If `last_run_status` is `error`, or `last_successful_run_at` is older than expected, check n8n and reconnect the Gmail credential there.
 
 ## Orphaned runs at startup
 
-If the API stops while a run is in progress, the run would stay `running` forever. The API uses one worker, so any run that is still `running` when the API starts was interrupted. At startup, before the scheduler thread starts, the backend closes every such run:
+If the API stops while a run is in progress, the run would stay `running` forever. The API uses one worker, so any run that is still `running` when the API starts was interrupted. When `SCHEDULER_THREAD_ENABLED` is `true` (the default), the backend closes every such run at startup, before the scheduler thread starts:
 
 - The run becomes `error` and gets a `finished_at`.
 - Each of its steps that is still `running` becomes `error` with the message `Interrupted by a restart.`. Steps that are `done`, `error` or `skipped` are not changed.
-- One line is written to `system_events` (component `startup`, level `warning`, message `Closed N orphaned run(s) at startup.`). Nothing is written when there is nothing to close. No notification is created.
+- One line is written to `system_events` (component `startup`, level `warning`). Nothing is written when there is nothing to close. No notification is created.
 
 If this cleanup fails, the API still starts.
-    
-## Test database
+
+## Testing
 
 Tests run against a separate database named `jobtracker_test` in the same PostgreSQL container, and refuse to run against any other database.
 
 Create it once (from the repository root):
 
-    sudo docker exec -i jobtracker-postgres psql -U jobtracker -d jobtracker -c "CREATE DATABASE jobtracker_test;"
-
-Apply the migrations to it:
-
-    cd backend
-    source .venv/bin/activate
-    POSTGRES_DB=jobtracker_test alembic upgrade head
+```bash
+sudo docker exec -i jobtracker-postgres psql -U jobtracker -d jobtracker -c "CREATE DATABASE jobtracker_test;"
+cd backend
+source .venv/bin/activate
+POSTGRES_DB=jobtracker_test alembic upgrade head
+```
 
 Run the tests:
 
-    pytest -q
+```bash
+pytest -q
+```
 
-Run migrations on the real database with plain `alembic upgrade head` (no `POSTGRES_DB` override). Do not run downgrades on the real database.
+Last full run (phase P10c-1): 944 passed in about 6.5 minutes, with one known httpx deprecation warning that is not being fixed.
+
+### Mock Groq
+
+Set `GROQ_MOCK=true` to avoid real Groq calls. The mock answers email classifier requests with class `interview` and confidence 90, and gives scoring requests a score JSON.
+
+### Smoke test
+
+The smoke test runs a full cycle against a scratch database named `jobtracker_smoke`. It never touches the real database. It uses mock Groq and fake keys, but it does use the real We Work Remotely and RemoteOK feeds in the hunt step, so it needs internet. Remotive is disabled in the scratch database. It asks for your `sudo` password.
+
+Use two terminals, in this order (from the repository root).
+
+Terminal 1, start a second API instance on port 8001 with its own environment overrides:
+
+```bash
+bash scripts/smoke_api.sh
+```
+
+Terminal 2, run the checks:
+
+```bash
+bash scripts/smoke.sh
+```
+
+`smoke.sh` refuses to run against any database other than `jobtracker_smoke`, creates it, migrates to head, seeds it, checks that the API really uses it, runs checks a to o, and drops the scratch database at the end. Expected output ends with:
+
+```text
+PASS o settings read, changed and restored
+ALL PASS a-o
+PASS cleanup: jobtracker_smoke dropped
+```
+
+Stop the API in terminal 1 with Ctrl+C when you are done.
+
+### Backup and restore check
+
+`scripts/backup_check.sh` makes a dump of the real database, restores it into a scratch database named `jobtracker_restore_check`, compares row counts for the 14 tables and the Alembic version, and drops the scratch database. It only reads the real database and never overwrites it.
+
+```bash
+bash scripts/backup_check.sh
+```
+
+The dump is written to `backups/jobtracker-<timestamp>.sql` with mode 600. `backups/` is git-ignored, and the script refuses to run if it is not. A dump contains personal data (profile and email data): keep copies private and never upload them. Expected output ends with:
+
+```text
+PASS row counts match for 14 tables
+PASS alembic_version is 0004 in both
+ALL PASS backup check
+PASS cleanup: jobtracker_restore_check dropped
+```
+
+If a count differs, rerun the script. The app may have written data while the dump was running.
+
+### Emergency restore
+
+This procedure has **not been tested end to end**. Use it as a starting point.
+
+1. Stop the API (and n8n, if running).
+2. Create a new, empty database:
+
+```bash
+sudo docker exec -i jobtracker-postgres psql -U jobtracker -d postgres -c "CREATE DATABASE jobtracker_restored;"
+```
+
+3. Restore the dump into it (replace the file name):
+
+```bash
+sudo docker exec -i jobtracker-postgres psql -U jobtracker -d jobtracker_restored -v ON_ERROR_STOP=1 -q < backups/<dump-file>.sql
+```
+
+4. Check the row counts and `alembic_version` in the new database.
+5. Point the API at it by setting `POSTGRES_DB` to `jobtracker_restored`, or rename the databases while keeping the old one (stop every connection first).
+6. Run `scripts/n8n_writer.sql` again so the `n8n_writer` role and its grants exist.
+
+Known gap: a dump from `pg_dump` does not include database roles, but it can contain grants to `n8n_writer`. The role may need to exist before the restore. Restoring after the whole Docker volume is lost is **not yet verified**, and the restore check compares only row counts and `alembic_version`.
+
+### Dependency audit
+
+`pip-audit` is an optional manual dev tool. It is installed only in the virtual environment and is not part of `backend/requirements.txt`. Run it with the virtual environment active:
+
+```bash
+source backend/.venv/bin/activate
+pip-audit
+```
+
+Last run on 2026-11-06: 6 findings, all in `pip` itself. They were fixed by upgrading to pip 26.3, and the re-run was clean.
+
+## Sources and attribution
+
+- **Remotive**: The seed data limits it to 4 runs per day (`max_runs_per_day`, counted by Asia/Manila day). Remotive's rules also say its data is delayed by 24 hours, that its jobs must not be submitted to other job sites, and that results must show "via Remotive" with a link back to the listing. The full terms (remotive.com/api-documentation) have **not been read yet** and must be read before any public demo. This project is **not a public demo** until then. Not yet verified: anything in this app that accounts for the 24-hour delay, and any UI that shows the attribution (there is no UI).
+- **We Work Remotely** and **RemoteOK**: check each site's terms before any public demo.
+
+## Known limitations and not yet verified
+
+- No frontend, no Chrome extension and no "+ Add Job" form yet.
+- The scheduler is off by default.
+- Gmail token expiry in "In production" mode: not yet verified.
+- Restore after a full Docker volume loss, and the order of the `n8n_writer` role and the restore: not yet verified.
+- `scripts/n8n_writer.sql` contains duplicate `GRANT` lines. They are harmless.
+- Tests show one old httpx deprecation warning.
+- Remotive terms are not yet read.
+
+## Privacy
+
+See `PRIVACY.md`. In short: Gmail is read-only, only allowlisted senders are read, and only the sender, subject and a snippet of at most 200 characters ever go to Groq.
