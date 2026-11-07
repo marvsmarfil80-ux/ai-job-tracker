@@ -68,6 +68,7 @@ class JobOut(BaseModel):
     pipeline_status: str
     filter_reason: str | None
     opened_at: datetime | None
+    dismissed_at: datetime | None
     created_at: datetime
     score: int | None = None
     verdict: Verdict | None = None

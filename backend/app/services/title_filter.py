@@ -76,7 +76,7 @@ def apply_title_filter(db: Session) -> dict[str, int]:
             "select j.id, j.title, j.priority, "
             "coalesce(s.keywords, array[]::text[]) as keywords "
             "from jobs j left join sources s on s.name = j.source "
-            "where j.pipeline_status = 'new'"
+            "where j.pipeline_status = 'new' and j.dismissed_at is null"
         )
     ).all()
 

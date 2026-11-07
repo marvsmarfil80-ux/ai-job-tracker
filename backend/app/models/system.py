@@ -23,7 +23,9 @@ NOTIFICATION_TYPES = (
     "follow_up_overdue",
     "status_changed",
     "email_needs_review",
+    "email_sync_failed",
 )
+
 _TYPES_SQL = ", ".join(f"'{t}'" for t in NOTIFICATION_TYPES)
 
 

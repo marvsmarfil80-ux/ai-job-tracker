@@ -18,9 +18,12 @@ from app.schemas.applications import (
 
 from app.security import require_api_key
 from app.services.applications import (
+    HISTORY_MESSAGE,
+    application_has_history,
     build_detail,
     build_out,
     create_application,
+    delete_application,
     update_application,
 )
 
@@ -53,6 +56,8 @@ def create(payload: ApplicationCreate, db: Session = Depends(get_db)):
     job = db.get(Job, payload.job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
+    if job.dismissed_at is not None:
+        raise HTTPException(status_code=409, detail="This job is dismissed. Restore it first.")
     existing_id = db.scalar(select(Application.id).where(Application.job_id == payload.job_id))
     if existing_id is not None:
         return duplicate_response(existing_id)
@@ -123,4 +128,11 @@ def change_application(
     update_application(db, application, payload.model_dump(exclude_unset=True))
     job = db.get(Job, application.job_id)
     return build_detail(db, application, job)
+
+@router.delete("/{application_id}", status_code=204)
+def remove_application(application_id: int = ApplicationId, db: Session = Depends(get_db)):
+    application = get_application_or_404(db, application_id)
+    if application_has_history(db, application):
+        raise HTTPException(status_code=409, detail=HISTORY_MESSAGE)
+    delete_application(db, application)
 

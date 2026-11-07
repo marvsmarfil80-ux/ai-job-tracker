@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import Session
 
-from app.models import Application, ApplicationEvent, Job
+from app.models import Application, ApplicationEvent, Email, FollowUp, Job
 from app.schemas.applications import (
     ApplicationCreate,
     ApplicationDetail,
@@ -89,4 +89,44 @@ def update_application(db: Session, application: Application, changes: dict) -> 
     new_status = changes.get("status")
     if new_status is not None:
         change_status(db, application, new_status)
+    db.commit()
+
+HISTORY_MESSAGE = "This application has history. Set its status to withdrawn instead."
+
+
+def application_has_history(db: Session, application: Application) -> bool:
+    if application.status != "applied":
+        return True
+    events = list_events(db, application.id)
+    if len(events) != 1:
+        return True
+    event = events[0]
+    if (
+        event.from_status is not None
+        or event.to_status != "applied"
+        or event.source != "manual"
+        or event.email_id is not None
+    ):
+        return True
+    linked_email = db.scalar(select(exists().where(Email.application_id == application.id)))
+    return bool(linked_email)
+
+
+def delete_application(db: Session, application: Application) -> None:
+    application_id = application.id
+    db.execute(
+        delete(FollowUp)
+        .where(FollowUp.application_id == application_id)
+        .execution_options(synchronize_session=False)
+    )
+    db.execute(
+        delete(ApplicationEvent)
+        .where(ApplicationEvent.application_id == application_id)
+        .execution_options(synchronize_session=False)
+    )
+    db.execute(
+        delete(Application)
+        .where(Application.id == application_id)
+        .execution_options(synchronize_session=False)
+    )
     db.commit()

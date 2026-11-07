@@ -79,7 +79,10 @@ def hunt_is_due(db, now: datetime, hours: int) -> bool:
 
 def scoring_has_work(db) -> bool:
     return db.execute(
-        text("select exists (select 1 from jobs where pipeline_status = 'new')")
+        text(
+            "select exists (select 1 from jobs "
+            "where pipeline_status = 'new' and dismissed_at is null)"
+        )
     ).scalar_one()
 
 

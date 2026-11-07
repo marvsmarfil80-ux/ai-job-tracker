@@ -2,7 +2,7 @@
 
 A personal web app that automatically searches for remote jobs (as far as each site allows), tracks job applications, and monitors job-related Gmail messages. It is built for personal use and as a portfolio project.
 
-> **Status:** The backend is complete through phase P10c. The frontend is postponed. There is no UI yet: use `curl`, `psql` and `pytest`.
+> **Status:** The backend is complete through phase P11a. The frontend is postponed. There is no UI yet: use `curl`, `psql` and `pytest`.
 
 ## Hard rules
 
@@ -106,6 +106,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 
 Use `--workers 1`. The scheduler and the orphaned-run cleanup assume a single worker. Settings are read once when the API starts, so restart the API after editing any env file. Run migrations on the real database with plain `alembic upgrade head`. Do not run downgrades on the real database.
 
+The current Alembic head is `0005`.
+
 Default data: `scripts/seed.sql` inserts the sources, default settings, an empty profile row and a starter allowed sender. It is safe to run again.
 
 The limited n8n role: `scripts/n8n_writer.sql` creates the role `n8n_writer` and its grants. It reads the password from the `N8N_WRITER_PASSWORD` environment variable of the `psql` process (`\getenv`). It is not part of Alembic. Run it again after any database rebuild.
@@ -170,19 +172,21 @@ All endpoints need `X-API-Key`, except `GET /health` (returns `{"status": "ok"}`
 
 | Area | Endpoints |
 | --- | --- |
-| Jobs | `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}`, `POST /jobs/{id}/open` |
+| Jobs | `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}`, `POST /jobs/{id}/open`, `POST /jobs/{id}/dismiss`, `POST /jobs/{id}/restore` |
 | Hunts | `POST /hunts`, `GET /hunts`, `GET /hunts/{id}` |
 | Sources | `GET /sources`, `PATCH /sources/{id}` |
 | Scoring | `POST /score/run` |
 | Settings | `GET /settings`, `PATCH /settings` |
 | Notifications | `GET /notifications`, `PATCH /notifications/{id}` |
 | Profile | `GET /profile`, `PUT /profile` |
-| Applications | `POST /applications`, `GET /applications`, `GET /applications/{id}`, `PATCH /applications/{id}` |
+| Applications | `POST /applications`, `GET /applications`, `GET /applications/{id}`, `PATCH /applications/{id}`, `DELETE /applications/{id}` |
 | Application events | `POST /application-events/{id}/undo` |
 | Follow-ups | `POST /follow-ups`, `GET /follow-ups`, `GET /follow-ups/{id}`, `PATCH /follow-ups/{id}`, `DELETE /follow-ups/{id}` |
 | Emails | `POST /emails/process`, `POST /emails/sync`, `GET /emails`, `GET /emails/{id}`, `PATCH /emails/{id}` |
 | Allowed senders | `GET /allowed-senders`, `POST /allowed-senders`, `PATCH /allowed-senders/{id}` |
 | System | `GET /system/status` |
+
+`GET /jobs` filters: `min_score`, `source`, `verdict`, `q`, `pipeline_status`, `awaiting_apply`, `dismissed`, `limit` and `offset`.
 
 ## Profile
 
@@ -218,7 +222,7 @@ Check `groq_view` after every save to confirm what will be sent to Groq. If the 
 
 Jobs that pass the title filter are scored from 0 to 100 by Groq (`openai/gpt-oss-20b`) against the sanitized profile.
 
-Run: `POST /score/run?limit=5` with the `X-API-Key` header. The limit is 1 to 20 (default 5). The request is synchronous, runs the title filter first, and scores high-priority and newest jobs first.
+Run: `POST /score/run?limit=5` with the `X-API-Key` header. The limit is 1 to 20 (default 5). The request is synchronous, runs the title filter first, and scores high-priority and newest jobs first. Dismissed jobs are skipped by the title filter and the scoring queue.
 
 Daily cap: the setting `daily_score_cap` limits Groq calls per UTC day. Stored scores and failed calls both count toward it.
 
@@ -231,19 +235,32 @@ Applications are created only by you. The app never submits an application and n
 "Did you apply?" flow:
 
 1. `POST /jobs/{id}/open` records that you opened the listing. It sets `opened_at` once (the first call wins and later calls do not change it). It does not create an application and does not change the pipeline status.
-2. `GET /jobs?awaiting_apply=true` lists jobs that were opened and have no application yet. `awaiting_apply=false` returns all other jobs. Without the parameter, the list behaves as before.
+2. `GET /jobs?awaiting_apply=true` lists jobs that were opened, have no application yet and are not dismissed. `awaiting_apply=false` returns all other jobs. Without the parameter, the list behaves as before.
 3. If you applied, call `POST /applications`. If you did not, nothing is recorded.
 
 Endpoints:
 
-- `POST /applications` with body `{"job_id": 1, "applied_at": "<ISO 8601 with timezone>", "notes": "<text>"}`. Only `job_id` is required. The status is set to `applied` and the first history event is written. `applied_at` defaults to now and cannot be more than 1 day in the future. `notes` can have up to 2000 characters. A job in any pipeline status is accepted. A second application for the same job returns 409 with `existing_id`.
+- `POST /applications` with body `{"job_id": 1, "applied_at": "<ISO 8601 with timezone>", "notes": "<text>"}`. Only `job_id` is required. The status is set to `applied` and the first history event is written. `applied_at` defaults to now and cannot be more than 1 day in the future. `notes` can have up to 2000 characters. A job in any pipeline status is accepted, except a dismissed job. A second application for the same job returns 409 with `existing_id`.
 - `GET /applications` supports `status`, `job_id`, `q` (searches job title and company), `limit` (default 50, maximum 200) and `offset`. The newest `applied_at` comes first. Each item includes a summary of its job.
 - `GET /applications/{id}` returns the application with its `events` (status history, oldest first).
 - `PATCH /applications/{id}` changes only `status` and `notes`. Any of the seven statuses can be set, because there are no transition rules yet. A status change writes a history event in the same transaction as the update. Setting the same status writes no event.
+- `DELETE /applications/{id}` is described below.
 
 Statuses: `applied`, `under_review`, `assessment`, `interview`, `offer`, `rejected`, `withdrawn`.
 
-Not available yet: deleting an application (use `withdrawn` instead) and a "dismissed" state for listings you did not apply to.
+Deleting: `DELETE /applications/{id}` removes an application only if it has no history. That means its status is `applied`, it has exactly one history event (the first one, written when you created it) and no email is linked to it. It deletes the application, that event and its follow-ups in one transaction and returns `204`. Otherwise it returns `409` with `This application has history. Set its status to withdrawn instead.`, and `404` if the application does not exist. Notifications that point to it are kept. After a delete, the job appears again in `awaiting_apply=true` if it was opened and is not dismissed.
+
+`POST /applications` for a dismissed job returns `409` with `This job is dismissed. Restore it first.`
+
+### Dismissing jobs
+
+Dismiss hides a listing you do not want to apply to. It is not a delete: the job and its normalized URL stay, so the same listing is not added again.
+
+- `POST /jobs/{id}/dismiss` sets `dismissed_at` to the current time. If the job is already dismissed it returns `200` and keeps the original time. It returns `404` if the job does not exist and `409` with `This job already has an application.` if the job has an application. It does not change the pipeline status, the scores or `opened_at`.
+- `POST /jobs/{id}/restore` clears `dismissed_at`. If the job is not dismissed it returns `200` and changes nothing. It returns `404` if the job does not exist.
+- `GET /jobs?dismissed=true` lists only dismissed jobs, `dismissed=false` lists only jobs that are not dismissed, and without the parameter all jobs are listed as before. Every job response includes `dismissed_at` (null or a time).
+- Dismissed jobs are skipped by the title filter and the scoring queue. A job dismissed while it is `new` stays `new` and goes back into the queue when it is restored.
+- Only the dismiss endpoint can set `dismissed_at`. `POST /jobs` and `PATCH /jobs/{id}` reject it.
 
 Example (replace `<API_KEY>` with your own key, and do not paste it anywhere public):
 
@@ -259,13 +276,25 @@ A follow-up is a simple to-do item attached to one application. It has a title, 
 - `GET /follow-ups` lists follow-ups. Filters: `status`, `application_id`, `overdue`, `limit`, `offset`.
 - `GET /follow-ups/{id}` returns one follow-up with a short summary of its application.
 - `PATCH /follow-ups/{id}` changes `title`, `due_date` (null clears it) or `status`.
-- `DELETE /follow-ups/{id}` deletes a follow-up. Deleting an application is still not available.
+- `DELETE /follow-ups/{id}` deletes a follow-up. Follow-ups are also deleted together with their application when that application is deleted.
 
 A follow-up is overdue when it is pending and its due date is before today in the Asia/Manila time zone. A due date of today is not overdue. `is_overdue` is calculated on every response and is not stored.
 
 Reminders: the scheduler checks for overdue follow-ups on its first tick after startup and then at most once per hour. Each overdue follow-up gets one in-app notification of type `follow_up_overdue` with the link `/follow-ups/{id}`. A follow-up is not notified again unless its due date is moved later and passes again. Completed follow-ups and follow-ups without a due date never notify. Follow-ups on rejected or withdrawn applications do not create new reminders. Notifications that already exist are kept.
 
 The setting `followup_reminders_enabled` (default `true`) turns reminders on or off.
+
+## Notifications
+
+Notifications are in-app only. `GET /notifications` lists them and `PATCH /notifications/{id}` marks one as read or unread. The types are:
+
+| Type | Created when |
+| --- | --- |
+| `hunt_done` | A hunt ends (done or failed), or an email sync finishes with at least one new email or job. |
+| `follow_up_overdue` | A pending follow-up passes its due date. |
+| `status_changed` | An email changes an application status automatically. |
+| `email_needs_review` | An application email needs your review. |
+| `email_sync_failed` | An email sync run ends with an error. |
 
 ## Email processing
 
@@ -318,6 +347,8 @@ Responses of `POST /emails/sync`:
 `since` is the start time of the last email run whose step is `done`, minus 1 hour so that nothing is missed. On the first sync it is now minus `email_sync_lookback_days`. The format is ISO 8601 in UTC.
 
 Errors are never silent. If n8n reports an error, or does not finish within `email_sync_timeout_seconds`, the step and the run are marked `error` and a line is written to `system_events` (component `email_sync`, with no email content). A stale check marks old `running` email syncs as `error` at the start of every sync and every scheduler email tick, for example after the backend restarted while waiting. Emails that stay `unprocessed` are handled by the next run. If email processing is busy (a hunt holds the same lock), the run ends with no new jobs and the emails wait for the next sync.
+
+Failure notification: when an email sync run ends with an error (the webhook cannot be reached, n8n reports an error, n8n does not finish in time, a stale run is found, or the backend fails unexpectedly), one `email_sync_failed` notification is created with a short message such as `Email check failed: <reason>`. If an unread `email_sync_failed` notification already exists, no new one is created. Nothing is created for the `409` and `503` responses (no run is started) or for runs closed at startup. If creating the notification fails, the run is still closed.
 
 Scheduler: the email sync job runs every `email_sync_interval_minutes`, only when `scheduler_enabled` is `true`. It waits for n8n in its own thread, so hunts and scoring are not blocked. Email runs are stored in `search_runs`, so they also appear in `GET /hunts`.
 
@@ -379,7 +410,7 @@ Run the tests:
 pytest -q
 ```
 
-Last full run (phase P10c-1): 944 passed in about 6.5 minutes, with one known httpx deprecation warning that is not being fixed.
+Last full run (phase P11a): 986 passed in about 6 minutes, with one known httpx deprecation warning that is not being fixed.
 
 ### Mock Groq
 
@@ -403,11 +434,11 @@ Terminal 2, run the checks:
 bash scripts/smoke.sh
 ```
 
-`smoke.sh` refuses to run against any database other than `jobtracker_smoke`, creates it, migrates to head, seeds it, checks that the API really uses it, runs checks a to o, and drops the scratch database at the end. Expected output ends with:
+`smoke.sh` refuses to run against any database other than `jobtracker_smoke`, creates it, migrates to head, seeds it, checks that the API really uses it, runs checks a to q, and drops the scratch database at the end. Expected output ends with:
 
 ```text
-PASS o settings read, changed and restored
-ALL PASS a-o
+PASS q application with history is refused, a fresh one is deleted and its job returns to awaiting apply
+ALL PASS a-q
 PASS cleanup: jobtracker_smoke dropped
 ```
 
@@ -425,7 +456,7 @@ The dump is written to `backups/jobtracker-<timestamp>.sql` with mode 600. `back
 
 ```text
 PASS row counts match for 14 tables
-PASS alembic_version is 0004 in both
+PASS alembic_version is 0005 in both
 ALL PASS backup check
 PASS cleanup: jobtracker_restore_check dropped
 ```

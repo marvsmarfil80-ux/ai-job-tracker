@@ -97,6 +97,7 @@ def list_jobs(
     q: str | None = Query(default=None, min_length=1, max_length=200),
     pipeline_status: PipelineStatus | None = None,
     awaiting_apply: bool | None = None,
+    dismissed: bool | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=1000000),
     db: Session = Depends(get_db),
@@ -115,8 +116,13 @@ def list_jobs(
         awaiting = and_(
             Job.opened_at.is_not(None),
             ~exists().where(Application.job_id == Job.id),
+            Job.dismissed_at.is_(None),
         )
         conditions.append(awaiting if awaiting_apply else not_(awaiting))
+    if dismissed is not None:
+        conditions.append(
+            Job.dismissed_at.is_not(None) if dismissed else Job.dismissed_at.is_(None)
+        )
     if q is not None:
         escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
@@ -178,6 +184,40 @@ def mark_job_opened(job_id: int = JobId, db: Session = Depends(get_db)):
     )
     db.commit()
     db.refresh(job)
+    apply_threshold, maybe_threshold = get_thresholds(db)
+    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+
+@router.post("/{job_id}/dismiss", response_model=JobOut)
+def dismiss_job(job_id: int = JobId, db: Session = Depends(get_db)):
+    job = get_job_or_404(db, job_id)
+    if job.dismissed_at is None:
+        has_application = db.scalar(select(exists().where(Application.job_id == job_id)))
+        if has_application:
+            raise HTTPException(status_code=409, detail="This job already has an application.")
+        db.execute(
+            update(Job)
+            .where(Job.id == job_id, Job.dismissed_at.is_(None))
+            .values(dismissed_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        db.commit()
+        db.refresh(job)
+    apply_threshold, maybe_threshold = get_thresholds(db)
+    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+
+
+@router.post("/{job_id}/restore", response_model=JobOut)
+def restore_job(job_id: int = JobId, db: Session = Depends(get_db)):
+    job = get_job_or_404(db, job_id)
+    if job.dismissed_at is not None:
+        db.execute(
+            update(Job)
+            .where(Job.id == job_id)
+            .values(dismissed_at=None)
+            .execution_options(synchronize_session=False)
+        )
+        db.commit()
+        db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
     return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
 

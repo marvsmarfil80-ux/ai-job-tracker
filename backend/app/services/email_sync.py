@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import SessionLocal
 from app.services.email_processing import run_email_processing
+from app.services.follow_up_reminders import clean_part
 from app.services.groq_client import get_groq_client
 from app.services.notifications import insert_notification
 from app.services.settings import read_values
@@ -21,10 +22,13 @@ POLL_SECONDS = 5.0
 OVERLAP = timedelta(hours=1)
 PROCESS_LIMIT = 100
 NOTIFICATION_TYPE = "hunt_done"
+TYPE_SYNC_FAILED = "email_sync_failed"
 MESSAGE_NOT_CONFIGURED = "The n8n webhook is not configured."
 MESSAGE_RUNNING = "An email sync is already running."
 MESSAGE_UNREACHABLE = "Could not reach the n8n webhook."
 MESSAGE_TIMEOUT = "n8n did not respond within the timeout."
+MESSAGE_IMPORTER_ERROR = "The n8n email importer reported an error."
+MESSAGE_UNEXPECTED = "The email sync failed unexpectedly."
 
 
 def default_groq_client():
@@ -49,6 +53,25 @@ def log_event(db: Session, level: str, message: str, run_id: int | None = None) 
     )
     db.commit()
 
+def notify_sync_failed(db: Session, reason: str) -> bool:
+    try:
+        unread = db.execute(
+            text(
+                "select exists (select 1 from notifications "
+                "where type = :type and is_read = false)"
+            ),
+            {"type": TYPE_SYNC_FAILED},
+        ).scalar_one()
+        if unread:
+            return False
+        detail = clean_part(reason) or "unknown error"
+        insert_notification(db, TYPE_SYNC_FAILED, f"Email check failed: {detail}", None)
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
+
 
 def close_run(db: Session, run_id: int, status: str, total_new: int = 0) -> None:
     db.execute(
@@ -59,6 +82,9 @@ def close_run(db: Session, run_id: int, status: str, total_new: int = 0) -> None
         {"status": status, "total": total_new, "id": run_id},
     )
     db.commit()
+
+
+
 
 
 def mark_step_error(db: Session, run_id: int, message: str) -> int:
@@ -87,6 +113,7 @@ def stale_check(db: Session, timeout_seconds: int, now: datetime | None = None) 
         if mark_step_error(db, run_id, MESSAGE_TIMEOUT) == 1:
             close_run(db, run_id, "error")
             log_event(db, "error", "A stale email sync was marked as failed.", run_id)
+            notify_sync_failed(db, MESSAGE_TIMEOUT)
     return len(run_ids)
 
 
@@ -157,6 +184,7 @@ def start_sync(db: Session, trigger: str, http_client: httpx.Client | None = Non
         mark_step_error(db, run_id, MESSAGE_UNREACHABLE)
         close_run(db, run_id, "error")
         log_event(db, "error", f"Could not reach the n8n webhook: {type(exc).__name__}", run_id)
+        notify_sync_failed(db, MESSAGE_UNREACHABLE)
         raise HTTPException(status_code=502, detail=MESSAGE_UNREACHABLE)
     return run_id
 
@@ -232,6 +260,7 @@ def record_failure(session_factory, run_id: int, exc: Exception) -> None:
             log_event(
                 db, "error", f"Email sync failed unexpectedly: {type(exc).__name__}", run_id
             )
+            notify_sync_failed(db, MESSAGE_UNEXPECTED)
     except Exception:
         pass
 
@@ -255,8 +284,10 @@ def finish_sync(
             elif outcome == "timeout":
                 close_run(db, run_id, "error")
                 log_event(db, "error", MESSAGE_TIMEOUT, run_id)
+                notify_sync_failed(db, MESSAGE_TIMEOUT)
             else:
                 close_run(db, run_id, "error")
-                log_event(db, "error", "The n8n email importer reported an error.", run_id)
+                log_event(db, "error", MESSAGE_IMPORTER_ERROR, run_id)
+                notify_sync_failed(db, MESSAGE_IMPORTER_ERROR)
     except Exception as exc:
         record_failure(session_factory, run_id, exc)

@@ -99,7 +99,7 @@ def load_queue(db: Session, limit: int) -> list[dict]:
     rows = db.execute(
         text(
             "select id, title, company, location, work_mode, description "
-            "from jobs where pipeline_status = 'new' "
+            "from jobs where pipeline_status = 'new' and dismissed_at is null "
             "order by priority desc, created_at desc, id desc limit :limit"
         ),
         {"limit": limit},
