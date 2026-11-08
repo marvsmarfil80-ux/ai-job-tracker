@@ -482,7 +482,7 @@ sudo docker exec -i jobtracker-postgres psql -U jobtracker -d jobtracker_restore
 
 4. Check the row counts and `alembic_version` in the new database.
 5. Point the API at it by setting `POSTGRES_DB` to `jobtracker_restored`, or rename the databases while keeping the old one (stop every connection first).
-6. Run `scripts/n8n_writer.sql` again so the `n8n_writer` role and its grants exist.
+6. Run `scripts/n8n_writer.sql` again so the `n8n_writer` role and its grants exist. It needs the `N8N_WRITER_PASSWORD` environment variable, as described in Setup.
 
 Known gap: a dump from `pg_dump` does not include database roles, but it can contain grants to `n8n_writer`. The role may need to exist before the restore. Restoring after the whole Docker volume is lost is **not yet verified**, and the restore check compares only row counts and `alembic_version`.
 

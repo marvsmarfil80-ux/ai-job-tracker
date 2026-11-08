@@ -1,4 +1,5 @@
 import itertools
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -58,8 +59,6 @@ def add_raw_job(source="remoteok", title="Plumber", priority=0, status="new"):
 
 
 def set_setting(key, value):
-    import json
-
     with engine.begin() as connection:
         connection.execute(
             text(

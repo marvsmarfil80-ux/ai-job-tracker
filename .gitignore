@@ -42,3 +42,6 @@ token.json
 profile.txt
 
 local-samples/
+
+# Local AI tool folders
+.qodo/

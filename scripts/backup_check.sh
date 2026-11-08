@@ -50,7 +50,7 @@ run_sql postgres "create database jobtracker_restore_check" >/dev/null
 STARTED=1
 pass "scratch database created"
 
-sudo docker exec -i jobtracker-postgres psql -U jobtracker -d "$RESTORE_DB" -v ON_ERROR_STOP=1 -q < "$FILE" >/dev/null 2>&1 || fail "restore: psql restore failed (output hidden)"
+sudo docker exec -i jobtracker-postgres psql -U jobtracker -d "$RESTORE_DB" -v ON_ERROR_STOP=1 -q < "$FILE" >/dev/null 2>&1 || fail  "restore: psql restore failed (output hidden)"
 pass "restore finished"
 
 mismatch=0
@@ -69,7 +69,8 @@ pass "row counts match for 14 tables"
 
 real_version="$(run_sql jobtracker "select version_num from alembic_version")"
 restored_version="$(run_sql "$RESTORE_DB" "select version_num from alembic_version")"
-[[ "$real_version" == "$restored_version" && "$real_version" == "0004" ]] || fail "alembic_version differs or is not 0004 (real=$real_version restored=$restored_version)"
-pass "alembic_version is 0004 in both"
+[[ -n "$real_version" ]] || fail "alembic_version: real database returned no version"
+[[ "$real_version" == "$restored_version" ]] || fail "alembic_version differs (real=$real_version restored=$restored_version)"
+pass "alembic_version is $real_version in both"
 
 echo "ALL PASS backup check"
