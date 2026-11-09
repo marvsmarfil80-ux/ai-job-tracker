@@ -510,26 +510,39 @@ If a count differs, rerun the script. The app may have written data while the du
 
 ### Emergency restore
 
-This procedure has **not been tested end to end**. Use it as a starting point.
+This procedure was checked in a drill on 2026-11-10. The drill ran in a temporary PostgreSQL 16.15 container, not after a real loss of the Docker volume.
 
 1. Stop the API (and n8n, if running).
-2. Create a new, empty database:
+2. Make sure the `n8n_writer` role exists before the restore. A dump from `pg_dump` does not include roles, but it does contain grants to `n8n_writer`. Without the role the restore stops with an error. If the role already exists, this command prints an error that you can ignore:
+
+```bash
+sudo docker exec -i jobtracker-postgres psql -U jobtracker -d postgres -c "CREATE ROLE n8n_writer NOLOGIN;"
+```
+
+3. Create a new, empty database:
 
 ```bash
 sudo docker exec -i jobtracker-postgres psql -U jobtracker -d postgres -c "CREATE DATABASE jobtracker_restored;"
 ```
 
-3. Restore the dump into it (replace the file name):
+4. Restore the dump into it (replace the file name) and check the exit code right away:
 
 ```bash
-sudo docker exec -i jobtracker-postgres psql -U jobtracker -d jobtracker_restored -v ON_ERROR_STOP=1 -q < backups/<dump-file>.sql
+sudo docker exec -i jobtracker-postgres psql -U jobtracker -d jobtracker_restored -v ON_ERROR_STOP=1 -q < backups/<dump-file>.sql; echo "exit code: $?"
 ```
 
-4. Check the row counts and `alembic_version` in the new database.
-5. Point the API at it by setting `POSTGRES_DB` to `jobtracker_restored`, or rename the databases while keeping the old one (stop every connection first).
-6. Run `scripts/n8n_writer.sql` again so the `n8n_writer` role and its grants exist. It needs the `N8N_WRITER_PASSWORD` environment variable, as described in Setup.
+The exit code must be 0. Do not rely on row counts alone (see the drill results below).
 
-Known gap: a dump from `pg_dump` does not include database roles, but it can contain grants to `n8n_writer`. The role may need to exist before the restore. Restoring after the whole Docker volume is lost is **not yet verified**, and the restore check compares only row counts and `alembic_version`.
+5. Check the row counts and `alembic_version` in the new database.
+6. Point the API at it by setting `POSTGRES_DB` to `jobtracker_restored`, or rename the databases while keeping the old one (stop every connection first).
+7. Run `scripts/n8n_writer.sql` so the role gets its login and password. It needs the `N8N_WRITER_PASSWORD` environment variable, as described in Setup.
+
+Drill results (2026-11-10):
+
+- Restore without the `n8n_writer` role: it stopped with exit code 3 and one error, `role "n8n_writer" does not exist`. Tables, data, constraints and indexes were all present and the row counts matched, but the 3 row-level security policies and the 4 `n8n_writer` grants were missing. Row counts alone do not show this.
+- Restore with the role created first (`NOLOGIN`, empty database): exit code 0 and no errors. Row counts for all 14 tables and `alembic_version` (0005) matched the real database, except `system_events`, which had 2 fewer rows (most likely because the dump is older than two later events). Constraints, indexes, policies and `n8n_writer` grants matched the real database.
+
+Not yet verified: restore after a full Docker volume loss into a brand new container, running `scripts/n8n_writer.sql` after a restore when the role already exists, and n8n connecting to a restored database.
 
 ### Dependency audit
 
@@ -552,7 +565,7 @@ Last run on 2026-11-06: 6 findings, all in `pip` itself. They were fixed by upgr
 - No frontend, no Chrome extension and no "+ Add Job" form yet.
 - The scheduler is off by default.
 - Gmail token expiry in "In production" mode: not yet verified.
-- Restore after a full Docker volume loss, and the order of the `n8n_writer` role and the restore: not yet verified.
+- Restore after a full Docker volume loss, and running `scripts/n8n_writer.sql` after a restore: not yet verified.
 - `scripts/n8n_writer.sql` contains duplicate `GRANT` lines. They are harmless.
 - Tests show one old httpx deprecation warning.
 - Remotive terms are not yet read.
