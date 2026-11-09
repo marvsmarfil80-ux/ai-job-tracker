@@ -266,4 +266,23 @@ api GET "/jobs?awaiting_apply=true"
 [[ "$(jget "any(i['id'] == $JOB_Q for i in d['items'])")" == "True" ]] || fail "q job did not return to awaiting_apply"
 pass "q application with history is refused, a fresh one is deleted and its job returns to awaiting apply"
 
-echo "ALL PASS a-q"
+EXTRACT_JSON='{"url": "https://example.com/test-smoke-extract", "page_text": "TEST page text for the smoke test only."}'
+api POST "/jobs/extract" "$EXTRACT_JSON"
+[[ "$CODE" == 200 ]] || failb "r extract"
+[[ "$(jget 'sorted(d)')" == "['company', 'description', 'title']" ]] || fail "r extract keys are not exactly title, company and description"
+[[ "$(jget 'd["title"]')" == "Mock Job Title" ]] || fail "r extract title"
+[[ "$(jget 'd["company"]')" == "Mock Company" ]] || fail "r extract company"
+[[ "$(jget 'd["description"]')" == "Mock job description." ]] || fail "r extract description"
+[[ "$(db "select count(*) from jobs where url_normalized = 'https://example.com/test-smoke-extract'")" == 0 ]] || fail "r extract saved a job"
+
+JOB_R_JSON='{"source": "extension", "title": "TEST Extract Job", "company": "TEST Company", "url": "https://example.com/test-smoke-extract"}'
+api POST "/jobs" "$JOB_R_JSON"
+[[ "$CODE" == 201 ]] || failb "r save job"
+JOB_R="$(jget 'd["id"]')"
+api POST "/jobs/extract" "$EXTRACT_JSON"
+[[ "$CODE" == 409 ]] || failb "r duplicate extract"
+[[ "$(jget 'd["existing_id"]')" == "$JOB_R" ]] || fail "r duplicate existing_id mismatch"
+[[ "$(db "select count(*) from system_events where component = 'extract' and message = 'Extract call'")" == 1 ]] || fail "r expected exactly 1 Extract call event"
+pass "r extract returns a draft without saving, and a duplicate returns 409 without an AI call"
+
+echo "ALL PASS a-r"

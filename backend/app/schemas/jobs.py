@@ -11,6 +11,13 @@ PipelineStatus = Literal["new", "filtered_out", "scored", "error"]
 Verdict = Literal["apply", "maybe", "skip"]
 
 
+def validate_http_url(value: str) -> str:
+    parts = urlsplit(value)
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+        raise ValueError("URL must start with http:// or https:// and include a host")
+    return value
+
+
 class JobCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -26,10 +33,7 @@ class JobCreate(BaseModel):
     @field_validator("url")
     @classmethod
     def check_url(cls, value: str) -> str:
-        parts = urlsplit(value)
-        if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
-            raise ValueError("URL must start with http:// or https:// and include a host")
-        return value
+        return validate_http_url(value)
 
 
 class JobUpdate(BaseModel):

@@ -1,11 +1,13 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
-from sqlalchemy import and_,exists, func, not_, or_, select, update
+from sqlalchemy import and_, exists, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Application, Job
+from app.schemas.extract import ExtractRequest, ExtractResponse
 from app.schemas.jobs import (
     JobCreate,
     JobList,
@@ -16,6 +18,8 @@ from app.schemas.jobs import (
     Verdict,
 )
 from app.security import require_api_key
+from app.services.extract import run_extract
+from app.services.groq_client import get_groq_client
 from app.services.jobs import (
     clean_description,
     get_thresholds,
@@ -87,6 +91,18 @@ def create_job(payload: JobCreate, db: Session = Depends(get_db)):
     db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
     return to_out(job, None, apply_threshold, maybe_threshold)
+
+@router.post("/extract", response_model=ExtractResponse)
+def extract_job_fields(
+    payload: ExtractRequest,
+    db: Session = Depends(get_db),
+    client: httpx.Client = Depends(get_groq_client),
+):
+    normalized = normalize_url(payload.url)
+    existing_id = db.scalar(select(Job.id).where(Job.url_normalized == normalized))
+    if existing_id is not None:
+        return duplicate_response(existing_id)
+    return run_extract(db, client, normalized, payload.page_text)
 
 
 @router.get("", response_model=JobList)

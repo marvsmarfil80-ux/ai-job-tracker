@@ -1,6 +1,8 @@
 import re
 from dataclasses import dataclass
 
+from app.services.jobs import strip_html
+
 REMOVED = "[removed]"
 MAX_OUTPUT_CHARS = 2000
 MIN_PHONE_DIGITS = 7
@@ -63,3 +65,10 @@ def address_warnings(text: str) -> list[str]:
     if _ADDRESS_WORDS.search(text):
         return [ADDRESS_WARNING]
     return []
+
+
+def sanitize_page_text(content: str) -> str:
+    text = strip_html(content)
+    text = _EMAIL.sub(REMOVED, text)
+    text, _ = _remove_phones(text)
+    return " ".join(text.split())

@@ -17,6 +17,10 @@ TRANSIENT_SLEEP_SECONDS = 2.0
 MOCK_CONTENT = json.dumps({"score": 55, "reason": "Mock score", "red_flags": []})
 MOCK_EMAIL_CONTENT = json.dumps({"class": "interview", "confidence": 90})
 EMAIL_REQUEST_MARKER = "email_metadata"
+MOCK_EXTRACT_CONTENT = json.dumps(
+    {"title": "Mock Job Title", "company": "Mock Company", "description": "Mock job description."}
+)
+EXTRACT_REQUEST_MARKER = "extract_job_fields"
 
 
 class GroqError(Exception):
@@ -73,6 +77,7 @@ def call_groq(
     client: httpx.Client,
     messages: list[dict[str, str]],
     sleep: Callable[[float], None] = time.sleep,
+    max_tokens: int = MAX_TOKENS,
 ) -> tuple[str, int | None]:
     settings = get_settings()
     if settings.groq_api_key is not None:
@@ -87,7 +92,7 @@ def call_groq(
         "model": settings.groq_model,
         "messages": messages,
         "temperature": 0,
-        "max_tokens": MAX_TOKENS,
+        "max_tokens": max_tokens,
         "reasoning_effort": settings.groq_reasoning_effort,
     }
 
@@ -126,7 +131,12 @@ def call_groq(
 
 def mock_handler(request: httpx.Request) -> httpx.Response:
     body = request.content.decode("utf-8", errors="replace")
-    content = MOCK_EMAIL_CONTENT if EMAIL_REQUEST_MARKER in body else MOCK_CONTENT
+    if EXTRACT_REQUEST_MARKER in body:
+        content = MOCK_EXTRACT_CONTENT
+    elif EMAIL_REQUEST_MARKER in body:
+        content = MOCK_EMAIL_CONTENT
+    else:
+        content = MOCK_CONTENT
     return httpx.Response(
         200,
         json={

@@ -2,7 +2,7 @@
 
 A personal web app that automatically searches for remote jobs (as far as each site allows), tracks job applications, and monitors job-related Gmail messages. It is built for personal use and as a portfolio project.
 
-> **Status:** The backend is complete through phase P11a. The frontend is postponed. There is no UI yet: use `curl`, `psql` and `pytest`.
+> **Status:** The backend is complete through phase P11c. The frontend is postponed. There is no UI yet: use `curl`, `psql` and `pytest`.
 
 ## Hard rules
 
@@ -48,6 +48,7 @@ What is built and what is not:
 | Job feeds (We Work Remotely, RemoteOK, Remotive) | Built |
 | LinkedIn job-alert emails (through email sync) | Built |
 | Manual `POST /jobs` (source `manual`, API only) | Built |
+| AI-assisted draft (`POST /jobs/extract`, API only, does not save) | Built |
 | "+ Add Job" form | Planned only (the frontend is postponed) |
 | Chrome extension | Planned only (`extension` is an accepted source value, but no extension exists) |
 
@@ -172,7 +173,7 @@ All endpoints need `X-API-Key`, except `GET /health` (returns `{"status": "ok"}`
 
 | Area | Endpoints |
 | --- | --- |
-| Jobs | `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}`, `POST /jobs/{id}/open`, `POST /jobs/{id}/dismiss`, `POST /jobs/{id}/restore` |
+| Jobs | `POST /jobs`, `POST /jobs/extract`, `GET /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}`, `POST /jobs/{id}/open`, `POST /jobs/{id}/dismiss`, `POST /jobs/{id}/restore` |
 | Hunts | `POST /hunts`, `GET /hunts`, `GET /hunts/{id}` |
 | Sources | `GET /sources`, `PATCH /sources/{id}` |
 | Scoring | `POST /score/run` |
@@ -224,9 +225,51 @@ Jobs that pass the title filter are scored from 0 to 100 by Groq (`openai/gpt-os
 
 Run: `POST /score/run?limit=5` with the `X-API-Key` header. The limit is 1 to 20 (default 5). The request is synchronous, runs the title filter first, and scores high-priority and newest jobs first. Dismissed jobs are skipped by the title filter and the scoring queue.
 
-Daily cap: the setting `daily_score_cap` limits Groq calls per UTC day. Stored scores and failed calls both count toward it.
+Daily cap: the setting `daily_score_cap` limits Groq calls per UTC day. Stored scores, failed calls and extract calls (see "Extracting a job draft") all count toward it.
 
 Stop reasons: `daily_cap_reached`, `rate_limited`, `groq_unavailable`, `groq_auth_error`.
+
+## Extracting a job draft
+
+`POST /jobs/extract` helps the future "+ Add Job" form and the Chrome extension. It reads the text of a web page and returns a **draft** title, company and description. It never saves anything. You review and correct the draft, then save it with `POST /jobs`.
+
+Request (JSON, header `X-API-Key`, no other fields are allowed):
+
+- `url`: the page address. It follows the same rules as `POST /jobs` (http or https with a host, up to 2000 characters).
+- `page_text`: the page text, 1 to 4,000 characters after trimming. Longer text returns `422`. The caller must cut it, the backend does not.
+
+Response `200`: `{"title": "...", "company": "... or null", "description": "... or null"}`.
+
+- The title is 1 to 200 characters. The company is 1 to 120 characters, or `null` when it is not written in the text. The description is `null` or at most 1,500 characters, cut at a word boundary.
+- All values are plain text, never HTML. A frontend must show them as text.
+- `POST /jobs` requires a company, so a form must ask you to fill it in when the draft has `null`.
+- Nothing is written to `jobs`. The only database writes are lines in `system_events` (see below).
+
+Order of checks: API key, input validation, duplicate check, readable text check, AI configured check, daily cap, then the AI call. A duplicate (the normalized URL already exists in `jobs`) returns `409` before any AI call, so it costs no tokens.
+
+What the AI sees: only the normalized URL (without tracking parameters) and the cleaned page text. The cleaning removes HTML, collapses whitespace and replaces email addresses and phone numbers with `[removed]`. Your profile and your emails are never sent. The prompt tells the model that the page text is data only and that it must not follow instructions inside it. The model cannot take any action. The code checks the answer: it must be a JSON object with exactly the keys `title`, `company` and `description` and valid values. An invalid answer gets one retry, then the request fails with `502`. HTML is removed from every field of the answer.
+
+Errors:
+
+| Status | Message | When |
+| --- | --- | --- |
+| `401` | `Invalid or missing API key` | The key is missing or wrong. |
+| `422` | standard validation error | Bad or missing field, a URL that is not http or https, empty or too long `page_text`, or an extra field. |
+| `409` | `Job already exists` (with `existing_id`) | The normalized URL is already in `jobs`. No AI call is made. |
+| `422` | `Page text has no readable content.` | Nothing is left after cleaning. No AI call is made. |
+| `422` | `Could not find a job title in this page text.` | The AI found no title. |
+| `429` | `The AI service is busy. Try again in a minute.` | Groq rate limit, after the retries. |
+| `429` | `Daily extraction limit reached.` | The daily cap is used up. |
+| `502` | `The AI service returned an invalid response.` | Two invalid answers in a row. |
+| `502` | `The AI service rejected our credentials.` | Groq rejected the API key. |
+| `503` | `The AI service is unavailable.` | Groq could not be reached, returned server errors, or rejected the request. |
+| `503` | `The AI service is not configured.` | No Groq key and mock mode is off. |
+
+Daily cap: at most 40 AI calls per UTC day. This is a constant in the code, not a setting. Every AI call counts, whether it succeeded, returned invalid output or failed, and a call that finds no title also counts. The cap is checked before every call, including the retry. The extract cap counts only extract calls. The scoring cap `daily_score_cap` also counts extract calls, so both features share one Groq quota. One extract call can use about 2,500 tokens at most (about 300 for the prompt, up to about 1,300 for 4,000 characters of page text, and up to 900 for the answer), and Groq allows about 8,000 tokens per minute.
+
+Logging: each AI call writes one line to `system_events` (component `extract`): `Extract call` at level `info`, or `Groq call failed: <reason>`. The page text, the URL and the AI output are never logged or stored.
+
+Real-model check (2026-11-09): two real Groq calls were made with invented job text. Both returned `200` with exactly the three keys and a complete answer that was not cut off at 900 tokens. The first removed navigation and cookie text from the description. The second had no company name in the text and returned `company` as `null`. This is a small check, not a quality guarantee: real pages vary a lot, so always review the draft.
 
 ## Applications
 
@@ -410,11 +453,13 @@ Run the tests:
 pytest -q
 ```
 
-Last full run (phase P11a): 986 passed in about 6 minutes, with one known httpx deprecation warning that is not being fixed.
+Last full run (phase P11c): 1050 passed in about 7 minutes, with one known httpx deprecation warning that is not being fixed.
 
 ### Mock Groq
 
 Set `GROQ_MOCK=true` to avoid real Groq calls. The mock answers email classifier requests with class `interview` and confidence 90, and gives scoring requests a score JSON.
+
+In mock mode, `POST /jobs/extract` returns a fixed draft: title `Mock Job Title`, company `Mock Company` and description `Mock job description.`
 
 ### Smoke test
 
@@ -434,11 +479,11 @@ Terminal 2, run the checks:
 bash scripts/smoke.sh
 ```
 
-`smoke.sh` refuses to run against any database other than `jobtracker_smoke`, creates it, migrates to head, seeds it, checks that the API really uses it, runs checks a to q, and drops the scratch database at the end. Expected output ends with:
+`smoke.sh` refuses to run against any database other than `jobtracker_smoke`, creates it, migrates to head, seeds it, checks that the API really uses it, runs checks a to r, and drops the scratch database at the end. Expected output ends with:
 
 ```text
-PASS q application with history is refused, a fresh one is deleted and its job returns to awaiting apply
-ALL PASS a-q
+PASS r extract returns a draft without saving, and a duplicate returns 409 without an AI call
+ALL PASS a-r
 PASS cleanup: jobtracker_smoke dropped
 ```
 

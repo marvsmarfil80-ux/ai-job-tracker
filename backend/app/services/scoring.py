@@ -32,6 +32,8 @@ COMPONENT = "scoring"
 FAILED_PREFIX = "Groq call failed"
 INVALID_OUTPUT_REASON = "scoring failed: invalid model output"
 MAX_ATTEMPTS_PER_JOB = 2
+EXTRACT_COMPONENT = "extract"
+EXTRACT_OK_MESSAGE = "Extract call"
 
 
 def utc_day_start() -> datetime:
@@ -57,9 +59,19 @@ def count_used_today(db: Session) -> int:
             "(select count(*) from job_scores where scored_at >= :start) "
             "+ (select count(*) from system_events "
             "where component = :component and starts_with(message, :prefix) "
+            "and occurred_at >= :start) "
+            "+ (select count(*) from system_events "
+            "where component = :extract_component "
+            "and (message = :extract_ok or starts_with(message, :prefix)) "
             "and occurred_at >= :start)"
         ),
-        {"start": utc_day_start(), "component": COMPONENT, "prefix": FAILED_PREFIX},
+        {
+            "start": utc_day_start(),
+            "component": COMPONENT,
+            "prefix": FAILED_PREFIX,
+            "extract_component": EXTRACT_COMPONENT,
+            "extract_ok": EXTRACT_OK_MESSAGE,
+        },
     ).scalar_one()
 
 

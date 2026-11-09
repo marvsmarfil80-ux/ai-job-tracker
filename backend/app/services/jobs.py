@@ -62,6 +62,18 @@ def clean_description(value: str | None) -> str | None:
     return cleaned or None
 
 
+def truncate_at_word(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    if value[limit].isspace():
+        return value[:limit].rstrip()
+    head = value[:limit]
+    boundary = head.rfind(" ")
+    if boundary <= 0:
+        return head.rstrip()
+    return head[:boundary].rstrip()
+
+
 def priority_for_source(source: str) -> int:
     return PRIORITY_BY_SOURCE[source]
 
