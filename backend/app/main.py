@@ -12,6 +12,7 @@ from app.db import get_db
 from app.routers.allowed_senders import router as allowed_senders_router
 from app.routers.application_events import router as application_events_router
 from app.routers.applications import router as applications_router
+from app.routers.dashboard import router as dashboard_router
 from app.routers.emails import router as emails_router
 from app.routers.follow_ups import router as follow_ups_router
 from app.routers.hunts import router as hunts_router
@@ -74,6 +75,7 @@ app.include_router(emails_router)
 app.include_router(allowed_senders_router)
 app.include_router(application_events_router)
 app.include_router(system_status_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/health")

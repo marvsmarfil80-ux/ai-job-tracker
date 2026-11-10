@@ -12,6 +12,7 @@ from app.schemas.jobs import (
     JobCreate,
     JobList,
     JobOut,
+    JobSort,
     JobUpdate,
     PipelineStatus,
     Source,
@@ -21,9 +22,11 @@ from app.security import require_api_key
 from app.services.extract import run_extract
 from app.services.groq_client import get_groq_client
 from app.services.jobs import (
+    NO_EXTRAS,
+    JobExtras,
     clean_description,
+    extras_for_job,
     get_thresholds,
-    latest_score_for_job,
     latest_scores,
     priority_for_source,
     verdict_for,
@@ -35,15 +38,17 @@ router = APIRouter(prefix="/jobs", tags=["jobs"], dependencies=[Depends(require_
 JobId = Path(ge=1, le=9223372036854775807)
 
 
-def to_out(job: Job, score: int | None, apply_threshold: int, maybe_threshold: int) -> JobOut:
+def to_out(job: Job, extras: JobExtras, apply_threshold: int, maybe_threshold: int) -> JobOut:
     out = JobOut.model_validate(job)
     return out.model_copy(
         update={
-            "score": score,
-            "verdict": verdict_for(score, apply_threshold, maybe_threshold),
+            "score": extras.score,
+            "verdict": verdict_for(extras.score, apply_threshold, maybe_threshold),
+            "reason": extras.reason,
+            "red_flags": extras.red_flags,
+            "application_id": extras.application_id,
         }
     )
-
 
 def duplicate_response(existing_id: int) -> JSONResponse:
     return JSONResponse(
@@ -90,7 +95,7 @@ def create_job(payload: JobCreate, db: Session = Depends(get_db)):
         raise
     db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
-    return to_out(job, None, apply_threshold, maybe_threshold)
+    return to_out(job, NO_EXTRAS, apply_threshold, maybe_threshold)
 
 @router.post("/extract", response_model=ExtractResponse)
 def extract_job_fields(
@@ -114,6 +119,8 @@ def list_jobs(
     pipeline_status: PipelineStatus | None = None,
     awaiting_apply: bool | None = None,
     dismissed: bool | None = None,
+    has_application: bool | None = None,
+    sort: JobSort = "default",
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=1000000),
     db: Session = Depends(get_db),
@@ -131,13 +138,17 @@ def list_jobs(
     if awaiting_apply is not None:
         awaiting = and_(
             Job.opened_at.is_not(None),
-            ~exists().where(Application.job_id == Job.id),
+            Application.id.is_(None),
             Job.dismissed_at.is_(None),
         )
         conditions.append(awaiting if awaiting_apply else not_(awaiting))
     if dismissed is not None:
         conditions.append(
             Job.dismissed_at.is_not(None) if dismissed else Job.dismissed_at.is_(None)
+        )
+    if has_application is not None:
+        conditions.append(
+            Application.id.is_not(None) if has_application else Application.id.is_(None)
         )
     if q is not None:
         escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -152,20 +163,37 @@ def list_jobs(
     elif verdict == "skip":
         conditions.append(latest.c.score < maybe_threshold)
 
-    def filtered(statement):
+    def joined(statement):
+        statement = statement.select_from(Job)
+        statement = statement.outerjoin(latest, latest.c.job_id == Job.id)
+        statement = statement.outerjoin(Application, Application.job_id == Job.id)
         return statement.where(*conditions) if conditions else statement
 
-    total = db.scalar(
-        filtered(select(func.count()).select_from(Job).outerjoin(latest, latest.c.job_id == Job.id))
-    )
+    if sort == "score_desc":
+        order = (latest.c.score.desc().nulls_last(), Job.created_at.desc(), Job.id.desc())
+    else:
+        order = (Job.priority.desc(), Job.created_at.desc(), Job.id.desc())
+
+    total = db.scalar(joined(select(func.count())))
     rows = db.execute(
-        filtered(select(Job, latest.c.score).outerjoin(latest, latest.c.job_id == Job.id))
-        .order_by(Job.priority.desc(), Job.created_at.desc(), Job.id.desc())
+        joined(
+            select(
+                Job,
+                latest.c.score,
+                latest.c.reason,
+                latest.c.red_flags,
+                Application.id,
+            )
+        )
+        .order_by(*order)
         .limit(limit)
         .offset(offset)
     ).all()
 
-    items = [to_out(job, score, apply_threshold, maybe_threshold) for job, score in rows]
+    items = [
+        to_out(job, JobExtras(score, reason, red_flags, application_id), apply_threshold, maybe_threshold)
+        for job, score, reason, red_flags, application_id in rows
+    ]
     return JobList(items=items, total=total, limit=limit, offset=offset)
 
 
@@ -173,7 +201,7 @@ def list_jobs(
 def get_job(job_id: int = JobId, db: Session = Depends(get_db)):
     job = get_job_or_404(db, job_id)
     apply_threshold, maybe_threshold = get_thresholds(db)
-    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+    return to_out(job, extras_for_job(db, job_id), apply_threshold, maybe_threshold)
 
 
 @router.patch("/{job_id}", response_model=JobOut)
@@ -187,7 +215,7 @@ def update_job(payload: JobUpdate, job_id: int = JobId, db: Session = Depends(ge
     db.commit()
     db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
-    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+    return to_out(job, extras_for_job(db, job_id), apply_threshold, maybe_threshold)
 
 @router.post("/{job_id}/open", response_model=JobOut)
 def mark_job_opened(job_id: int = JobId, db: Session = Depends(get_db)):
@@ -201,7 +229,7 @@ def mark_job_opened(job_id: int = JobId, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
-    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+    return to_out(job, extras_for_job(db, job_id), apply_threshold, maybe_threshold)
 
 @router.post("/{job_id}/dismiss", response_model=JobOut)
 def dismiss_job(job_id: int = JobId, db: Session = Depends(get_db)):
@@ -219,7 +247,7 @@ def dismiss_job(job_id: int = JobId, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
-    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+    return to_out(job, extras_for_job(db, job_id), apply_threshold, maybe_threshold)
 
 
 @router.post("/{job_id}/restore", response_model=JobOut)
@@ -235,5 +263,5 @@ def restore_job(job_id: int = JobId, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(job)
     apply_threshold, maybe_threshold = get_thresholds(db)
-    return to_out(job, latest_score_for_job(db, job_id), apply_threshold, maybe_threshold)
+    return to_out(job, extras_for_job(db, job_id), apply_threshold, maybe_threshold)
 

@@ -1,10 +1,11 @@
+from dataclasses import dataclass
 from html.parser import HTMLParser
 
 from fastapi import HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from app.models import JobScore
+from app.models import Application, Job, JobScore
 
 MAX_STORED_DESCRIPTION = 1500
 
@@ -104,24 +105,47 @@ def verdict_for(score: int | None, apply_threshold: int, maybe_threshold: int) -
     return "skip"
 
 
-def latest_scores():
-    ranked = select(
+@dataclass(frozen=True)
+class JobExtras:
+    score: int | None
+    reason: str | None
+    red_flags: list[str] | None
+    application_id: int | None
+
+
+NO_EXTRAS = JobExtras(None, None, None, None)
+
+
+def latest_scores(job_id: int | None = None):
+    ranked_query = select(
         JobScore.job_id.label("job_id"),
         JobScore.score.label("score"),
+        JobScore.reason.label("reason"),
+        JobScore.red_flags.label("red_flags"),
         func.row_number()
         .over(
             partition_by=JobScore.job_id,
             order_by=(JobScore.scored_at.desc(), JobScore.id.desc()),
         )
         .label("rn"),
-    ).subquery()
-    return select(ranked.c.job_id, ranked.c.score).where(ranked.c.rn == 1).subquery()
-
-
-def latest_score_for_job(db: Session, job_id: int) -> int | None:
-    return db.scalar(
-        select(JobScore.score)
-        .where(JobScore.job_id == job_id)
-        .order_by(JobScore.scored_at.desc(), JobScore.id.desc())
-        .limit(1)
     )
+    if job_id is not None:
+        ranked_query = ranked_query.where(JobScore.job_id == job_id)
+    ranked = ranked_query.subquery()
+    return select(
+        ranked.c.job_id, ranked.c.score, ranked.c.reason, ranked.c.red_flags
+    ).where(ranked.c.rn == 1).subquery()
+
+
+def extras_for_job(db: Session, job_id: int) -> JobExtras:
+    latest = latest_scores(job_id)
+    row = db.execute(
+        select(latest.c.score, latest.c.reason, latest.c.red_flags, Application.id)
+        .select_from(Job)
+        .outerjoin(latest, latest.c.job_id == Job.id)
+        .outerjoin(Application, Application.job_id == Job.id)
+        .where(Job.id == job_id)
+    ).first()
+    if row is None:
+        return NO_EXTRAS
+    return JobExtras(*row)

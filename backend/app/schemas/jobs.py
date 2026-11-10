@@ -9,6 +9,7 @@ CreatableSource = Literal["manual", "extension"]
 WorkMode = Literal["remote", "hybrid", "on_site"]
 PipelineStatus = Literal["new", "filtered_out", "scored", "error"]
 Verdict = Literal["apply", "maybe", "skip"]
+JobSort = Literal["default", "score_desc"]
 
 
 def validate_http_url(value: str) -> str:
@@ -76,6 +77,9 @@ class JobOut(BaseModel):
     created_at: datetime
     score: int | None = None
     verdict: Verdict | None = None
+    reason: str | None = None
+    red_flags: list[str] | None = None
+    application_id: int | None = None
 
 
 class JobList(BaseModel):

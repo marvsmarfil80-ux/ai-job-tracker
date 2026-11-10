@@ -186,8 +186,34 @@ All endpoints need `X-API-Key`, except `GET /health` (returns `{"status": "ok"}`
 | Emails | `POST /emails/process`, `POST /emails/sync`, `GET /emails`, `GET /emails/{id}`, `PATCH /emails/{id}` |
 | Allowed senders | `GET /allowed-senders`, `POST /allowed-senders`, `PATCH /allowed-senders/{id}` |
 | System | `GET /system/status` |
+| Dashboard | `GET /dashboard/summary` |
 
-`GET /jobs` filters: `min_score`, `source`, `verdict`, `q`, `pipeline_status`, `awaiting_apply`, `dismissed`, `limit` and `offset`.
+`GET /jobs` filters: `min_score`, `source`, `verdict`, `q`, `pipeline_status`, `awaiting_apply`, `dismissed`, `has_application`, `limit` and `offset`. Sort with `sort=default|score_desc`.
+
+### Job fields, sorting and dashboard
+
+Every endpoint that returns a job (`POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}`, `POST /jobs/{id}/open`, `/dismiss` and `/restore`) returns the same shape. Besides `score` and `verdict`, it has three read-only fields set by code from the database:
+
+- `reason`: the reason text of the latest score row, or `null` when the job has no score. It is AI-written plain text and must be rendered as plain text.
+- `red_flags`: the list of red flags of the latest score row, or `null` when the job has no score.
+- `application_id`: the id of the job's application, or `null` when it has none.
+
+The latest score row is the one with the highest `scored_at`, with the highest `id` as tie-break. `POST /jobs` and `PATCH /jobs/{id}` reject these fields with `422`. The list is built with one query, so there is no per-row lookup.
+
+- `has_application=true` lists only jobs that have an application, `false` lists only jobs without one, and without the parameter all jobs are listed. Any other value returns `422`. It works together with every other filter, and `total` follows the filters.
+- `sort=default` keeps the existing order (priority, newest first, then id). `sort=score_desc` orders by the latest score, highest first, with unscored jobs last, then newest first, then id. Any other value returns `422`.
+
+`GET /dashboard/summary` returns five integers, computed from the database on every call (no Groq call, nothing stored):
+
+| Field | Meaning |
+| --- | --- |
+| `total_applications` | Number of applications. |
+| `interviews` | Applications whose status is `interview` right now. |
+| `pending_follow_ups` | Follow-ups whose status is `pending`. |
+| `jobs_discovered` | Jobs that are not dismissed and whose pipeline status is not `filtered_out`. |
+| `recommended_jobs` | Not dismissed jobs without an application whose latest verdict is `apply`. It equals `total` of `GET /jobs?verdict=apply&dismissed=false&has_application=false`. |
+
+The "AI Recommended Jobs" list is `GET /jobs?verdict=apply&dismissed=false&has_application=false&sort=score_desc&limit=5`.
 
 ## Profile
 
@@ -569,6 +595,7 @@ Last run on 2026-11-06: 6 findings, all in `pip` itself. They were fixed by upgr
 - `scripts/n8n_writer.sql` contains duplicate `GRANT` lines. They are harmless.
 - Tests show one old httpx deprecation warning.
 - Remotive terms are not yet read.
+- The `sources` table has no rows for `linkedin_email`, `extension` and `manual`, so a "via <source>" badge for those jobs needs a mapping in the frontend or a seed in a later phase.
 
 ## Privacy
 
