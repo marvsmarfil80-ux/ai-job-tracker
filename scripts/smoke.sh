@@ -114,7 +114,7 @@ if [[ "$(jget 'd["status"] != "error" and any(s["status"] == "done" for s in d["
   fail "d hunt: no feed finished (check internet) steps=$(jget '[(s["source"], s["status"], s["message"]) for s in d["steps"]]')"
 fi
 [[ "$(db "select count(*) from notifications where type = 'hunt_done'")" -ge 1 ]] || fail "d hunt: no hunt_done notification"
-pass "d hunt steps=$(jget '[(s["source"], s["status"], s["found"], s["new"]) for s in d["steps"]]')"
+pass "d hunt steps=$(jget '[(s["source"], s["status"], s["found"], s["new"], s["message"]) for s in d["steps"]]')"
 
 before="$(db "select count(*) from job_scores")"
 api POST "/score/run?limit=3"

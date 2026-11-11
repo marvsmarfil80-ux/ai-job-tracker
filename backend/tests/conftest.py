@@ -61,3 +61,7 @@ def clean_tables():
     yield
     with engine.begin() as connection:
         _clean(connection)
+
+@pytest.fixture(autouse=True)
+def no_feed_pause(monkeypatch):
+    monkeypatch.setattr("app.services.hunts.PAUSE_BETWEEN_URLS_SECONDS", 0)

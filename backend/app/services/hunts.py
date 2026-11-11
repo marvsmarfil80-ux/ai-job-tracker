@@ -1,3 +1,5 @@
+import time
+
 import httpx
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -6,7 +8,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db import engine
-from app.services.feeds import PARSERS, FeedError, FeedJob, fetch_feed
+from app.services.feeds import (
+    PARSERS,
+    SOURCE_URLS,
+    FeedError,
+    FeedJob,
+    feed_label,
+    fetch_feed,
+)
 from app.services.jobs import priority_for_source
 from app.services.notifications import notify_hunt_done
 
@@ -15,6 +24,7 @@ COMPONENT = "feeds"
 TRIGGER_MANUAL = "manual"
 TRIGGER_SCHEDULED = "scheduled"
 DEFAULT_MAX_RUNS_PER_DAY = 4
+PAUSE_BETWEEN_URLS_SECONDS = 1.0
 DAY_START_SQL = (
     "(date_trunc('day', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila')"
 )
@@ -134,21 +144,52 @@ def run_source(db: Session, client: httpx.Client, run_id: int, source: str) -> t
     step_id = add_step(db, run_id, source, "running")
     db.execute(text("update sources set last_run_at = now() where name = :name"), {"name": source})
     db.commit()
+    urls = SOURCE_URLS[source]
+    seen: set[str] = set()
+    found = 0
+    new = 0
+    skipped = 0
+    parts: list[str] = []
+    reasons: list[str] = []
     try:
-        raw = fetch_feed(client, source)
-        parsed = PARSERS[source](raw)
-        new, failed = save_jobs(db, parsed.jobs)
-    except FeedError as exc:
-        db.rollback()
-        return fail_step(db, run_id, step_id, source, str(exc))
+        for index, url in enumerate(urls):
+            if index > 0:
+                time.sleep(PAUSE_BETWEEN_URLS_SECONDS)
+            try:
+                raw = fetch_feed(client, source, url)
+                parsed = PARSERS[source](raw)
+            except FeedError as exc:
+                reasons.append(str(exc))
+                parts.append(f"{feed_label(url)} failed")
+                continue
+            batch = []
+            for job in parsed.jobs:
+                if job.url_normalized not in seen:
+                    seen.add(job.url_normalized)
+                    batch.append(job)
+            added, failed = save_jobs(db, batch)
+            found += len(batch)
+            new += added
+            skipped += parsed.skipped + failed
+            parts.append(f"{feed_label(url)} found {len(parsed.jobs)} new {added}")
     except Exception as exc:
         db.rollback()
         return fail_step(
             db, run_id, step_id, source, f"Unexpected {type(exc).__name__} while processing feed"
         )
-    skipped = parsed.skipped + failed
-    message = f"Skipped {skipped} invalid items" if skipped else None
-    finish_step(db, step_id, "done", len(parsed.jobs), new, message)
+    ok = len(urls) - len(reasons)
+    if ok == 0:
+        db.rollback()
+        distinct = list(dict.fromkeys(reasons))
+        reason = distinct[0] if len(distinct) == 1 else "All feed URLs failed"
+        return fail_step(db, run_id, step_id, source, reason)
+    if len(urls) == 1:
+        message = f"Skipped {skipped} invalid items" if skipped else None
+    else:
+        message = f"{ok} of {len(urls)} feed URLs ok: " + ", ".join(parts)
+        if skipped:
+            message += f"; skipped {skipped} invalid items"
+    finish_step(db, step_id, "done", found, new, message)
     db.commit()
     return "done", new
 

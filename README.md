@@ -54,9 +54,9 @@ What is built and what is not:
 
 Feeds in the code:
 
-- `weworkremotely`: the customer support category RSS feed only.
+- `weworkremotely`: three category RSS feeds (customer support, programming, all other), fetched in one step per hunt. See "Source terms".
 - `remoteok`: the RemoteOK API.
-- `remotive`: the Remotive API. See "Sources and attribution".
+- `remotive`: the Remotive API. See "Source terms".
 
 ## Repository layout
 
@@ -581,10 +581,18 @@ pip-audit
 
 Last run on 2026-11-06: 6 findings, all in `pip` itself. They were fixed by upgrading to pip 26.3, and the re-run was clean.
 
-## Sources and attribution
+## Source terms
 
-- **Remotive**: The seed data limits it to 4 runs per day (`max_runs_per_day`, counted by Asia/Manila day). Remotive's rules also say its data is delayed by 24 hours, that its jobs must not be submitted to other job sites, and that results must show "via Remotive" with a link back to the listing. The full terms (remotive.com/api-documentation) have **not been read yet** and must be read before any public demo. This project is **not a public demo** until then. Not yet verified: anything in this app that accounts for the 24-hour delay, and any UI that shows the attribution (there is no UI).
-- **We Work Remotely** and **RemoteOK**: check each site's terms before any public demo.
+Read each site's full terms before any public demo. This project is not a public demo.
+
+- **We Work Remotely**: public RSS feeds. The app reads three category feeds as one source (`weworkremotely`), with one step per hunt:
+  - customer support: `https://weworkremotely.com/categories/remote-customer-support-jobs.rss`
+  - programming: `https://weworkremotely.com/categories/remote-programming-jobs.rss`
+  - all other: `https://weworkremotely.com/categories/all-other-remote-jobs.rss`
+
+  The feeds are fetched one after another, with a 1-second pause between them (`PAUSE_BETWEEN_URLS_SECONDS` in `backend/app/services/hunts.py`). Every URL gets the same protections: 5 MB size limit, 20-second timeout, no redirects, and XML that contains `<!ENTITY` is rejected. In the step, `found` counts unique jobs across the three feeds (a listing that appears in two categories is counted once) and `new` counts the jobs that were actually inserted. The step is `done` if at least one URL worked (the message names the URLs that failed) and `error` if all of them failed. The daily limit counts runs, not URLs. Attribution: each job keeps its original We Work Remotely link in `url`, so it links back to the listing.
+- **RemoteOK**: the terms returned in the feed require a link back to RemoteOK and naming RemoteOK as the source. In the code, the first item of the feed is a legal notice (it has a `legal` key). The parser skips it, so it is not stored or shown. Each job keeps its original RemoteOK link in `url`, and the source badge is "RemoteOK". There is no UI yet that shows the attribution, so this is not verified end to end.
+- **Remotive**: Remotive delays its API data by 24 hours itself; this app has no code for that. Its terms require "via Remotive" and a link back to the listing, and say the jobs must not be submitted to other job sites and must not be used to collect signups or emails. The limit is at most 4 requests per day: the app sends one request per hunt, and `max_runs_per_day` is 4 by default (counted by Asia/Manila day) and the API rejects values above 4. The full official terms (remotive.com/api-documentation) have not been reviewed by the project owner and must be reviewed before any public demo.
 
 ## Known limitations and not yet verified
 

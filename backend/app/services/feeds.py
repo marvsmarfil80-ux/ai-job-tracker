@@ -11,10 +11,21 @@ import httpx
 from app.services.jobs import clean_description
 from app.services.normalize import normalize_url
 
+WWR_CATEGORY_BASE = "https://weworkremotely.com/categories/"
+WWR_CATEGORY_SLUGS = (
+    "remote-customer-support-jobs",
+    "remote-programming-jobs",
+    "all-other-remote-jobs",
+)
 FEED_URLS = {
-    "weworkremotely": "https://weworkremotely.com/categories/remote-customer-support-jobs.rss",
+    "weworkremotely": f"{WWR_CATEGORY_BASE}{WWR_CATEGORY_SLUGS[0]}.rss",
     "remoteok": "https://remoteok.com/api",
     "remotive": "https://remotive.com/api/remote-jobs",
+}
+SOURCE_URLS = {
+    "weworkremotely": tuple(f"{WWR_CATEGORY_BASE}{slug}.rss" for slug in WWR_CATEGORY_SLUGS),
+    "remoteok": (FEED_URLS["remoteok"],),
+    "remotive": (FEED_URLS["remotive"],),
 }
 USER_AGENT = "Mozilla/5.0 (compatible; JobTrackerPersonal/0.1)"
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
@@ -50,14 +61,19 @@ def get_feed_client() -> httpx.Client:
     return httpx.Client(follow_redirects=False)
 
 
-def fetch_feed(client: httpx.Client, source: str) -> bytes:
+def feed_label(url: str) -> str:
+    name = urlsplit(url).path.rsplit("/", 1)[-1]
+    return name.removesuffix(".rss") or "feed"
+
+
+def fetch_feed(client: httpx.Client, source: str, url: str | None = None) -> bytes:
     started = time.monotonic()
     chunks: list[bytes] = []
     total = 0
     try:
         with client.stream(
             "GET",
-            FEED_URLS[source],
+            url or FEED_URLS[source],
             headers={"User-Agent": USER_AGENT},
             timeout=TIMEOUT_SECONDS,
         ) as response:

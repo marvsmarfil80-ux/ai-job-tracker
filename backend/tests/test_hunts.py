@@ -179,7 +179,10 @@ def test_all_sources_succeed(feeds):
     assert steps["weworkremotely"]["status"] == "done"
     assert steps["weworkremotely"]["found"] == 2
     assert steps["weworkremotely"]["new"] == 2
-    assert steps["weworkremotely"]["message"] is None
+    assert steps["weworkremotely"]["message"] == (
+        "3 of 3 feed URLs ok: remote-customer-support-jobs found 2 new 2, "
+        "remote-programming-jobs found 2 new 0, all-other-remote-jobs found 2 new 0"
+    )
     assert steps["remoteok"]["found"] == 1
     assert steps["remoteok"]["new"] == 1
     assert steps["remotive"]["found"] == 1
