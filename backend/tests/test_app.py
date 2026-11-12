@@ -83,7 +83,8 @@ def test_correct_api_key_is_accepted(protected_client):
     assert response.status_code == 200
 
 
-def test_groq_mock_flag_is_parsed():
+def test_groq_mock_flag_is_parsed(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     settings = make_settings(groq_mock="true")
     assert settings.groq_mock is True
     assert settings.groq_api_key is None

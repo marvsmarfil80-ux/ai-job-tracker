@@ -1,6 +1,11 @@
 import os
 os.environ["POSTGRES_DB"] = "jobtracker_test"
 os.environ["SCHEDULER_THREAD_ENABLED"] = "false"
+os.environ["API_KEY"] = "test-api-key-not-real-01234567890123456789012345"
+os.environ["GROQ_API_KEY"] = "test-groq-key-not-real"
+os.environ["N8N_WRITER_PASSWORD"] = "test-n8n-writer-password-not-real"
+os.environ["N8N_WEBHOOK_URL"] = "http://127.0.0.1:9/webhook/test"
+os.environ["N8N_WEBHOOK_KEY"] = "test-webhook-key-not-real"
 
 import pytest
 from sqlalchemy import text
