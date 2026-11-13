@@ -342,6 +342,9 @@ def test_scoring_error_does_not_raise(monkeypatch):
     monkeypatch.setattr(scheduler, "score_step", boom)
     add_run(hours_ago=1)
     summary = do_tick(SchedulerState(), groq=ok_groq)
+    assert summary["scoring"] == "error"
+    assert scheduler_events() == [("error", "Scheduled scoring failed: RuntimeError")]
+    assert all("secret detail" not in message for message in all_event_messages())
 
 def test_settings_read_failure_does_not_raise():
     def broken_factory():

@@ -24,6 +24,7 @@ COMPONENT = "feeds"
 TRIGGER_MANUAL = "manual"
 TRIGGER_SCHEDULED = "scheduled"
 DEFAULT_MAX_RUNS_PER_DAY = 4
+MAX_RUNS_PER_DAY_LIMIT = 4
 PAUSE_BETWEEN_URLS_SECONDS = 1.0
 DAY_START_SQL = (
     "(date_trunc('day', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila')"
@@ -39,7 +40,8 @@ INSERT_JOB = text(
 
 
 def effective_limit(value: int | None) -> int:
-    return DEFAULT_MAX_RUNS_PER_DAY if value is None else value
+    limit = DEFAULT_MAX_RUNS_PER_DAY if value is None else value
+    return min(limit, MAX_RUNS_PER_DAY_LIMIT)
 
 
 def count_runs_today(db: Session, source: str) -> int:

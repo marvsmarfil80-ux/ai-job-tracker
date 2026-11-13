@@ -600,7 +600,6 @@ Read each site's full terms before any public demo. This project is not a public
 - The scheduler is off by default.
 - Gmail token expiry in "In production" mode: not yet verified.
 - Restore after a full Docker volume loss, and running `scripts/n8n_writer.sql` after a restore: not yet verified.
-- `scripts/n8n_writer.sql` contains duplicate `GRANT` lines. They are harmless.
 - Tests show one old httpx deprecation warning.
 - Remotive terms are not yet read.
 - The `sources` table has no rows for `linkedin_email`, `extension` and `manual`, so a "via <source>" badge for those jobs needs a mapping in the frontend or a seed in a later phase.
