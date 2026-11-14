@@ -180,6 +180,7 @@ All endpoints need `X-API-Key`, except `GET /health` (returns `{"status": "ok"}`
 | Settings | `GET /settings`, `PATCH /settings` |
 | Notifications | `GET /notifications`, `PATCH /notifications/{id}` |
 | Profile | `GET /profile`, `PUT /profile` |
+| Resume draft | `POST /profile/resume/draft` (API only, does not save) |
 | Applications | `POST /applications`, `GET /applications`, `GET /applications/{id}`, `PATCH /applications/{id}`, `DELETE /applications/{id}` |
 | Application events | `POST /application-events/{id}/undo` |
 | Follow-ups | `POST /follow-ups`, `GET /follow-ups`, `GET /follow-ups/{id}`, `PATCH /follow-ups/{id}`, `DELETE /follow-ups/{id}` |
@@ -296,6 +297,49 @@ Daily cap: at most 40 AI calls per UTC day. This is a constant in the code, not 
 Logging: each AI call writes one line to `system_events` (component `extract`): `Extract call` at level `info`, or `Groq call failed: <reason>`. The page text, the URL and the AI output are never logged or stored.
 
 Real-model check (2026-11-09): two real Groq calls were made with invented job text. Both returned `200` with exactly the three keys and a complete answer that was not cut off at 900 tokens. The first removed navigation and cookie text from the description. The second had no company name in the text and returned `company` as `null`. This is a small check, not a quality guarantee: real pages vary a lot, so always review the draft.
+
+## Resume draft
+
+`POST /profile/resume/draft` reads a PDF resume and returns a **draft** list of skills. It never saves anything. You review the draft and save it yourself with `PUT /profile`.
+
+Request: raw body `application/pdf` (no multipart), at most 2,097,152 bytes (2 MiB) and at most 5 pages. If the file is encrypted, has too many pages, or has no readable text, the request fails. If Groq is not configured and mock mode is off, the request fails with 503.
+
+What the code does before the AI call:
+
+1. Reads the body with a hard cap. It stops reading when the cap is reached, even if the client sends no `Content-Length`.
+2. Requires `Content-Type: application/pdf` and checks that the first bytes are `%PDF-`.
+3. Extracts the text of every page with `pypdf`. Encrypted PDFs, PDFs with more than 5 pages, and PDFs with no readable text are rejected.
+4. Removes contact details and identifiers. The same patterns as the profile sanitizer are used for emails, phones and label lines (`address`, `phone`, `mobile`, `email`, `contact`, `tel`). Two extra rules are applied: URLs that start with `http://`, `https://` or `www.` are replaced with `[removed]`, and lines that look like a postal address (a 4-5 digit postal code together with words such as `street`, `st.`, `ave`, `avenue`, `brgy`, `barangay`, `city`, `province`, `zip`, `postal` or `subdivision`) are replaced with `[removed]`. The address rule is a best-effort heuristic; it is not a guarantee.
+5. Caps the text at 6,000 characters after redaction. `truncated` is true when the cap was used.
+
+What the AI sees: only the redacted text inside `<resume_text>` delimiters. The prompt tells the model that the text is data only, that it must not follow instructions inside it, and that it must return only `{"skills": ["<skill>", ...]}`. The code decides everything. The model cannot take any action.
+
+What the code checks after the AI call: the answer must be a JSON object with exactly the key `skills` and a list of strings. Every skill is trimmed, must be 1 to 50 characters, must not contain line breaks or control characters, and must appear in the redacted text (case-insensitive, whitespace-normalized, with a word-boundary check that also works for symbols such as `C++`, `.NET` and `Node.js`). Duplicates are removed (case-insensitive, first spelling kept). At most 40 skills are kept. A skill that the model returns but that is not in the text is dropped and counted in `dropped_skills`. An invalid answer gets one retry, then the request fails with `502`. If no valid skill remains, the request fails with `422`.
+
+Response (200): `skills`, `draft_content` (built by the code from the validated skills, at most 2,000 characters, cut at a skill boundary), `pages`, `extracted_chars` (before redaction and cap), `truncated`, `redactions` (`emails`, `phones`, `lines`, `urls`, `address_lines`), `dropped_skills`, `warnings` (fixed English strings only). No PDF text is ever returned or logged.
+
+| Status | Detail | When |
+| --- | --- | --- |
+| `401` | `Invalid or missing API key` | Missing or wrong `X-API-Key`. |
+| `413` | `The PDF is too large.` | More than 2 MiB. |
+| `415` | `Only PDF files are supported.` | Wrong `Content-Type`. |
+| `422` | `The file is not a valid PDF.` | The first bytes are not `%PDF-` or `pypdf` cannot read the file. |
+| `422` | `The PDF is encrypted.` | The PDF is password-protected. |
+| `422` | `The PDF has too many pages.` | More than 5 pages. |
+| `422` | `The PDF has no readable text.` | Every page is empty or image-only. OCR is not used. |
+| `422` | `No skills could be found in this PDF.` | The AI answer had no skill that is actually in the text. |
+| `429` | `The AI service is busy. Try again in a minute.` | The AI rate limit was hit. |
+| `429` | `Daily resume draft limit reached.` | The resume cap (5 per UTC day) or the shared `daily_score_cap` is used up. |
+| `502` | `The AI service returned an invalid response.` | Two invalid answers in a row. |
+| `502` | `The AI service rejected our credentials.` | The AI key was rejected. |
+| `503` | `The AI service is unavailable.` | Network or server error at the AI provider. |
+| `503` | `The AI service is not configured.` | No AI key and mock mode is off. |
+
+Daily cap: at most 5 resume draft calls per UTC day. This is a constant in the code, not a setting. Every AI call counts, whether it succeeded, returned invalid output or failed. Resume calls also count toward the shared `daily_score_cap` that scoring uses, so both features share one Groq quota. Input errors (401, 413, 415, 422 before the AI call) do not count and do not call Groq.
+
+What is NOT removed: the code does not remove your name, employer names, school names, job titles or other details. The redacted text is sent to Groq (a third party). If that is not acceptable for a given file, do not use this endpoint; you can still write the profile by hand with `PUT /profile`.
+
+Logging: each AI call writes one line to `system_events` (component `resume`): `Resume draft call` at level `info`, or `Groq call failed: <reason>`. Counts only (pages, character count, skill count) may appear in the response. The PDF text, the AI answer and the skill names are never logged or stored.
 
 ## Applications
 
@@ -487,6 +531,8 @@ Set `GROQ_MOCK=true` to avoid real Groq calls. The mock answers email classifier
 
 In mock mode, `POST /jobs/extract` returns a fixed draft: title `Mock Job Title`, company `Mock Company` and description `Mock job description.`
 
+In mock mode, `POST /profile/resume/draft` returns the mock skills (`Python`, `SQL`, `Git`, `FastAPI`, `PostgreSQL`, `Docker`) that actually appear in the redacted text. It returns only those that match; a text with no matching skill returns an empty list, and the endpoint responds with `422 No skills could be found in this PDF.`.
+
 ### Smoke test
 
 The smoke test runs a full cycle against a scratch database named `jobtracker_smoke`. It never touches the real database. It uses mock Groq and fake keys, but it does use the real We Work Remotely and RemoteOK feeds in the hunt step, so it needs internet. Remotive is disabled in the scratch database. It asks for your `sudo` password.
@@ -578,6 +624,7 @@ Not yet verified: restore after a full Docker volume loss into a brand new conta
 source backend/.venv/bin/activate
 pip-audit
 ```
+`pypdf==7.1.0` is the only PDF library in the backend. It is pinned in `backend/requirements.txt` and is audited by the same `pip-audit` command.
 
 Last run on 2026-11-06: 6 findings, all in `pip` itself. They were fixed by upgrading to pip 26.3, and the re-run was clean.
 

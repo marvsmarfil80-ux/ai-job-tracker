@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from collections.abc import Callable, Iterator
 
@@ -21,6 +22,8 @@ MOCK_EXTRACT_CONTENT = json.dumps(
     {"title": "Mock Job Title", "company": "Mock Company", "description": "Mock job description."}
 )
 EXTRACT_REQUEST_MARKER = "extract_job_fields"
+RESUME_REQUEST_MARKER = "resume_skills"
+MOCK_RESUME_SKILLS = ["Python", "SQL", "Git", "FastAPI", "PostgreSQL", "Docker"]
 
 
 class GroqError(Exception):
@@ -135,6 +138,17 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
         content = MOCK_EXTRACT_CONTENT
     elif EMAIL_REQUEST_MARKER in body:
         content = MOCK_EMAIL_CONTENT
+    elif RESUME_REQUEST_MARKER in body:
+        mock_messages = json.loads(body).get("messages", [])
+        user_text = str(mock_messages[-1].get("content", "")).lower() if mock_messages else ""
+        filtered = [
+            skill
+            for skill in MOCK_RESUME_SKILLS
+            if re.search(
+                r"(?<![a-z0-9])" + re.escape(skill.lower()) + r"(?![a-z0-9])", user_text
+            )
+        ]
+        content = json.dumps({"skills": filtered})
     else:
         content = MOCK_CONTENT
     return httpx.Response(

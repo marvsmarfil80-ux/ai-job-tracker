@@ -19,6 +19,7 @@ from app.routers.hunts import router as hunts_router
 from app.routers.jobs import router as jobs_router
 from app.routers.notifications import router as notifications_router
 from app.routers.profile import router as profile_router
+from app.routers.resume import router as resume_router
 from app.routers.score import router as score_router
 from app.routers.settings import router as settings_router
 from app.routers.sources import router as sources_router
@@ -69,6 +70,7 @@ app.include_router(sources_router)
 app.include_router(settings_router)
 app.include_router(notifications_router)
 app.include_router(profile_router)
+app.include_router(resume_router)
 app.include_router(applications_router)
 app.include_router(follow_ups_router)
 app.include_router(emails_router)
