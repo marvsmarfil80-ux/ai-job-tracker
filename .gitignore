@@ -45,3 +45,14 @@ local-samples/
 
 # Local AI tool folders
 .qodo/
+.opencode/
+.qodo/
+
+# Frontend
+.env.*
+!.env.example
+dist/
+*.tsbuildinfo
+
+# Numbered backup copies
+*.bak-*
