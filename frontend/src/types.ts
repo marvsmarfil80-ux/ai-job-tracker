@@ -55,3 +55,37 @@ export type JobList = {
   limit: number
   offset: number
 }
+
+export type ProfileRedactions = {
+  emails: number
+  phones: number
+  lines: number
+}
+
+export type ProfileOut = {
+  content: string
+  updated_at: string
+  char_count: number
+  groq_view: string
+  redactions: ProfileRedactions
+  warnings: string[]
+}
+
+export type ResumeDraftRedactions = {
+  emails: number
+  phones: number
+  lines: number
+  urls: number
+  address_lines: number
+}
+
+export type ResumeDraftOut = {
+  skills: string[]
+  draft_content: string
+  pages: number
+  extracted_chars: number
+  truncated: boolean
+  redactions: ResumeDraftRedactions
+  dropped_skills: number | string[]
+  warnings: string[]
+}
