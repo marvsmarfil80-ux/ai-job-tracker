@@ -7,6 +7,9 @@ type ProfileEditorProps = {
   message: string | null
   onSave: () => void
   saving: boolean
+  dirty: boolean
+  showSaved: boolean
+  showEmptyNotice: boolean
 }
 
 export default function ProfileEditor({
@@ -16,6 +19,9 @@ export default function ProfileEditor({
   message,
   onSave,
   saving,
+  dirty,
+  showSaved,
+  showEmptyNotice,
 }: ProfileEditorProps) {
   const trimmedLength = value.trim().length
   const isOverLimit = value.length > 2000
@@ -24,6 +30,12 @@ export default function ProfileEditor({
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-5">
       <h2 className="font-semibold text-neutral-900">Profile text</h2>
+      {showEmptyNotice && (
+        <p className="mt-1 text-sm text-neutral-500">
+          Your profile is empty. Write it here and press Save. Scoring does not run until a
+          profile is saved.
+        </p>
+      )}
       <textarea
         aria-label="Profile text"
         value={value}
@@ -36,18 +48,24 @@ export default function ProfileEditor({
         <span className={isOverLimit ? 'text-red-600' : 'text-neutral-500'}>
           {value.length} / 2000
         </span>
+        {dirty && <span className="font-medium text-neutral-700">Unsaved changes</span>}
         {updatedAt !== '' && (
           <span className="text-neutral-500">Last saved {formatDateTime(updatedAt)}</span>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saveDisabled}
-        className="mt-4 rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
-      >
-        Save
-      </button>
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saveDisabled}
+          className="rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
+        >
+          Save
+        </button>
+        {showSaved && updatedAt !== '' && (
+          <span className="text-sm text-accent-700">Saved {formatDateTime(updatedAt)}</span>
+        )}
+      </div>
     </div>
   )
 }

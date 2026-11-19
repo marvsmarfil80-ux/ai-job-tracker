@@ -5,8 +5,9 @@ import type { ResumeDraftOut } from '../types'
 type ResumeDraftCardProps = {
   draft: ResumeDraftOut | null
   busy: boolean
-  error: string | null
+  error: { status: number; detail: string } | null
   onCreate: (file: File) => void
+  onClearError: () => void
   onAddDraft: () => void
   addMessage: string | null
 }
@@ -22,6 +23,7 @@ export default function ResumeDraftCard({
   busy,
   error,
   onCreate,
+  onClearError,
   onAddDraft,
   addMessage,
 }: ResumeDraftCardProps) {
@@ -29,6 +31,7 @@ export default function ResumeDraftCard({
   const [fileError, setFileError] = useState('')
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    onClearError()
     const file = event.target.files?.[0]
 
     if (!file) {
@@ -91,7 +94,21 @@ export default function ResumeDraftCard({
         </button>
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {busy && (
+        <p className="mt-2 text-sm text-neutral-600">
+          Reading your PDF and asking Groq. This can take a while.
+        </p>
+      )}
+      {error && (
+        <>
+          <p className="mt-2 text-sm text-red-600">{error.detail}</p>
+          {error.status === 429 && error.detail === 'Daily resume draft limit reached.' && (
+            <p className="mt-1 text-sm text-neutral-600">
+              Resume drafts are limited to 5 per day (UTC), shared with job scoring.
+            </p>
+          )}
+        </>
+      )}
       {fileError && <p className="mt-2 text-sm text-red-600">{fileError}</p>}
       {selectedFile && (
         <p className="mt-2 text-sm text-neutral-600">

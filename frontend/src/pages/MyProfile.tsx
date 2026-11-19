@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import ProfileEditor from '../components/ProfileEditor'
 import GroqViewPanel from '../components/GroqViewPanel'
 import ResumeDraftCard from '../components/ResumeDraftCard'
+import SkeletonBlock from '../components/SkeletonBlock'
+import ErrorState from '../components/ErrorState'
 import { api } from '../lib/api'
 import { ApiError } from '../types'
 import type { ProfileOut, ResumeDraftOut } from '../types'
@@ -12,10 +14,14 @@ export default function MyProfile() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const [draft, setDraft] = useState<ResumeDraftOut | null>(null)
   const [draftBusy, setDraftBusy] = useState(false)
-  const [draftError, setDraftError] = useState<string | null>(null)
+  const [draftError, setDraftError] = useState<{ status: number; detail: string } | null>(
+    null,
+  )
   const [addMessage, setAddMessage] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -41,18 +47,21 @@ export default function MyProfile() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloadKey])
+
+  function handleRetry() {
+    setLoadError(null)
+    setReloadKey((key) => key + 1)
+  }
 
   async function handleSave() {
     if (saving) return
     setSaving(true)
     setSaveError(null)
+    setJustSaved(false)
 
     try {
       await api.put<unknown>('/profile', { content: text })
-      const updated = await api.get<ProfileOut>('/profile')
-      setProfile(updated)
-      setText(updated.content)
     } catch (error) {
       if (error instanceof ApiError) {
         setSaveError(
@@ -60,7 +69,20 @@ export default function MyProfile() {
             ? error.validation.map((item) => item.msg).join(' ')
             : error.detail,
         )
+      } else {
+        setSaveError('Could not save the profile.')
       }
+      setSaving(false)
+      return
+    }
+
+    try {
+      const updated = await api.get<ProfileOut>('/profile')
+      setProfile(updated)
+      setText(updated.content)
+      setJustSaved(true)
+    } catch {
+      setSaveError('The profile was saved, but it could not be reloaded. Refresh the page.')
     } finally {
       setSaving(false)
     }
@@ -82,7 +104,9 @@ export default function MyProfile() {
       setDraft(result)
     } catch (error) {
       if (error instanceof ApiError) {
-        setDraftError(error.detail)
+        setDraftError({ status: error.status, detail: error.detail })
+      } else {
+        setDraftError({ status: 0, detail: 'Could not create the draft.' })
       }
     } finally {
       setDraftBusy(false)
@@ -102,14 +126,47 @@ export default function MyProfile() {
     }
 
     setText(nextText)
+    setJustSaved(false)
     setAddMessage(null)
+  }
+
+  if (loadError !== null) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold text-neutral-900">My Profile</h1>
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
+          <ErrorState message={loadError} onRetry={handleRetry} />
+        </div>
+      </div>
+    )
   }
 
   if (profile === null) {
     return (
-      <div>
+      <div aria-busy="true">
         <h1 className="text-2xl font-semibold text-neutral-900">My Profile</h1>
-        {loadError && <p className="mt-2 text-sm text-red-600">{loadError}</p>}
+
+        <div className="mt-6 grid grid-cols-3 gap-6">
+          <div className="col-span-2 rounded-lg border border-neutral-200 bg-white p-5">
+            <SkeletonBlock className="h-5 w-40" />
+            <SkeletonBlock className="mt-4 h-64 w-full" />
+            <SkeletonBlock className="mt-3 h-4 w-24" />
+            <SkeletonBlock className="mt-4 h-8 w-24" />
+          </div>
+          <div className="rounded-lg border border-neutral-200 bg-white p-5">
+            <SkeletonBlock className="h-5 w-32" />
+            <SkeletonBlock className="mt-4 h-4 w-full" />
+            <SkeletonBlock className="mt-2 h-4 w-5/6" />
+            <SkeletonBlock className="mt-2 h-4 w-4/6" />
+            <SkeletonBlock className="mt-4 h-24 w-full" />
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-5">
+          <SkeletonBlock className="h-5 w-36" />
+          <SkeletonBlock className="mt-3 h-4 w-3/4" />
+          <SkeletonBlock className="mt-4 h-9 w-64" />
+        </div>
       </div>
     )
   }
@@ -122,11 +179,17 @@ export default function MyProfile() {
         <div className="col-span-2">
           <ProfileEditor
             value={text}
-            onChange={setText}
+            onChange={(value) => {
+              setText(value)
+              setJustSaved(false)
+            }}
             updatedAt={profile.updated_at}
             message={saveError}
             onSave={handleSave}
             saving={saving}
+            dirty={text !== profile.content}
+            showSaved={justSaved}
+            showEmptyNotice={profile.content.trim() === ''}
           />
         </div>
         <GroqViewPanel
@@ -142,6 +205,7 @@ export default function MyProfile() {
           busy={draftBusy}
           error={draftError}
           onCreate={handleCreateDraft}
+          onClearError={() => setDraftError(null)}
           onAddDraft={handleAddDraft}
           addMessage={addMessage}
         />
