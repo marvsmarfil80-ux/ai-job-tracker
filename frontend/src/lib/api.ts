@@ -22,7 +22,7 @@ function buildUrl(path: string, query?: Query): string {
 async function request<T>(
   method: string,
   path: string,
-  options: { query?: Query; body?: unknown } = {},
+  options: { query?: Query; body?: unknown; raw?: { data: Blob; contentType: string } } = {},
 ): Promise<T> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -30,8 +30,16 @@ async function request<T>(
   try {
     const response = await fetch(buildUrl(path, options.query), {
       method,
-      headers: options.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      headers: options.raw
+        ? { 'Content-Type': options.raw.contentType }
+        : options.body !== undefined
+          ? { 'Content-Type': 'application/json' }
+          : undefined,
+      body: options.raw
+        ? options.raw.data
+        : options.body !== undefined
+          ? JSON.stringify(options.body)
+          : undefined,
       signal: controller.signal,
     })
 
@@ -69,6 +77,8 @@ async function request<T>(
 export const api = {
   get: <T>(path: string, query?: Query) => request<T>('GET', path, { query }),
   post: <T>(path: string, body?: unknown, query?: Query) => request<T>('POST', path, { body, query }),
+  postRaw: <T>(path: string, data: Blob, contentType: string) =>
+    request<T>('POST', path, { raw: { data, contentType } }),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body }),
   delete: <T>(path: string) => request<T>('DELETE', path),

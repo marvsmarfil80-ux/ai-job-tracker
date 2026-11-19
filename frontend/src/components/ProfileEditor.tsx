@@ -5,6 +5,8 @@ type ProfileEditorProps = {
   onChange: (value: string) => void
   updatedAt: string
   message: string | null
+  onSave: () => void
+  saving: boolean
 }
 
 export default function ProfileEditor({
@@ -12,10 +14,12 @@ export default function ProfileEditor({
   onChange,
   updatedAt,
   message,
+  onSave,
+  saving,
 }: ProfileEditorProps) {
   const trimmedLength = value.trim().length
   const isOverLimit = value.length > 2000
-  const saveDisabled = trimmedLength === 0 || trimmedLength > 2000
+  const saveDisabled = trimmedLength === 0 || trimmedLength > 2000 || saving
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-5">
@@ -32,10 +36,13 @@ export default function ProfileEditor({
         <span className={isOverLimit ? 'text-red-600' : 'text-neutral-500'}>
           {value.length} / 2000
         </span>
-        <span className="text-neutral-500">Last saved {formatDateTime(updatedAt)}</span>
+        {updatedAt !== '' && (
+          <span className="text-neutral-500">Last saved {formatDateTime(updatedAt)}</span>
+        )}
       </div>
       <button
         type="button"
+        onClick={onSave}
         disabled={saveDisabled}
         className="mt-4 rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
       >
