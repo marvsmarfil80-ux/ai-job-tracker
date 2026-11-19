@@ -25,6 +25,8 @@ export default function JobHunter() {
 
   const [runRunning, setRunRunning] = useState(false)
   const [runMessage, setRunMessage] = useState<string | null>(null)
+  const [runNotice, setRunNotice] = useState<string | null>(null)
+  const [newestBusy, setNewestBusy] = useState(false)
 
   const [scoreRunning, setScoreRunning] = useState(false)
   const [scoreResult, setScoreResult] = useState<ScoreRunResult | null>(null)
@@ -35,13 +37,20 @@ export default function JobHunter() {
 
     async function load() {
       try {
-        const [huntsData, sourcesData] = await Promise.all([
+        const [huntsData, sourcesData, newestData] = await Promise.all([
           api.get<HuntList>('/hunts', { limit: 10, offset }),
           api.get<SourceList>('/sources'),
+          api.get<HuntList>('/hunts', { limit: 1, offset: 0 }),
         ])
         if (cancelled) return
         setHuntList(huntsData)
         setSources(sourcesData.items)
+        const newest = newestData.items[0]
+        setNewestBusy(
+          newest !== undefined &&
+            (newest.status === 'running' ||
+              newest.steps.some((step) => step.status === 'running')),
+        )
         setLoadError(null)
       } catch (error) {
         if (cancelled) return
@@ -83,18 +92,32 @@ export default function JobHunter() {
   async function handleRun() {
     setRunRunning(true)
     setRunMessage(null)
+    setRunNotice(null)
 
     try {
-      await api.post<HuntRun>('/hunts')
+      const run = await api.post<HuntRun>('/hunts')
+      const allSkipped =
+        run.steps.length > 0 && run.steps.every((step) => step.status === 'skipped')
+      setRunNotice(
+        allSkipped ? 'No source was run. See the history for the reasons.' : null,
+      )
       setLoading(true)
       setOffset(0)
       setReloadKey((key) => key + 1)
     } catch (error) {
-      if (error instanceof ApiError && typeof error.detail === 'string') {
+      if (error instanceof ApiError && error.status === 409) {
+        setRunMessage(error.detail)
+      } else if (error instanceof ApiError && error.status === 0) {
+        setRunMessage(
+          'The request did not finish. The hunt may still be running. Check the history in a minute.',
+        )
+      } else if (error instanceof ApiError && typeof error.detail === 'string') {
         setRunMessage(error.detail)
       } else {
         setRunMessage('Could not run the hunt.')
       }
+      setLoading(true)
+      setReloadKey((key) => key + 1)
     } finally {
       setRunRunning(false)
     }
@@ -161,19 +184,16 @@ export default function JobHunter() {
     )
   }
 
-  const busy = huntList.items.some(
-    (run) => run.status === 'running' || run.steps.some((step) => step.status === 'running'),
-  )
-
   return (
     <div>
       <h1 className="text-2xl font-semibold text-neutral-900">Job Hunter</h1>
 
       <div className="mt-6 grid grid-cols-2 gap-6">
         <RunHuntCard
-          busy={busy}
+          busy={newestBusy}
           running={runRunning}
           message={runMessage}
+          notice={runNotice}
           onRun={handleRun}
         />
         <ScoreNewJobsCard

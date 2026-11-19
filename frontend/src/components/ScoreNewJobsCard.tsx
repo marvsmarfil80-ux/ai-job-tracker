@@ -17,6 +17,17 @@ function clampLimit(value: string): number {
   return Math.min(20, Math.max(1, Math.trunc(parsed)))
 }
 
+const stoppedMessages: Record<string, string> = {
+  daily_cap_reached: 'Stopped: the daily AI limit was reached.',
+  rate_limited: 'Stopped: the AI service is busy. Try again in a minute.',
+  groq_unavailable: 'Stopped: the AI service is unavailable.',
+  groq_auth_error: 'Stopped: the AI service rejected our credentials.',
+}
+
+function stoppedText(value: string): string {
+  return stoppedMessages[value] ?? `Stopped: ${value}`
+}
+
 export default function ScoreNewJobsCard({
   running,
   result,
@@ -76,6 +87,9 @@ export default function ScoreNewJobsCard({
         </button>
       </div>
 
+      {running && (
+        <p className="mt-3 text-sm text-neutral-600">Scoring can take up to a minute.</p>
+      )}
       {error !== null && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       {result !== null && (
@@ -132,7 +146,12 @@ export default function ScoreNewJobsCard({
           </dl>
 
           {result.stopped_reason !== null && (
-            <p className="mt-3 text-sm text-neutral-600">{result.stopped_reason}</p>
+            <p className="mt-3 text-sm text-neutral-600">
+              {stoppedText(result.stopped_reason)}
+            </p>
+          )}
+          {result.attempted === 0 && result.stopped_reason === null && (
+            <p className="mt-3 text-sm text-neutral-600">No jobs were ready to score.</p>
           )}
         </div>
       )}
