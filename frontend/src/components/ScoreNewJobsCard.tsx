@@ -4,19 +4,39 @@ import { Sparkles } from 'lucide-react'
 import type { ScoreRunResult } from '../types'
 
 type ScoreNewJobsCardProps = {
+  running: boolean
   result: ScoreRunResult | null
+  error: string | null
+  onScore: (limit: number) => void
 }
 
-export default function ScoreNewJobsCard({ result }: ScoreNewJobsCardProps) {
-  const [count, setCount] = useState(5)
+function clampLimit(value: string): number {
+  if (value.trim() === '') return 5
+  const parsed = Number(value)
+  if (Number.isNaN(parsed)) return 5
+  return Math.min(20, Math.max(1, Math.trunc(parsed)))
+}
+
+export default function ScoreNewJobsCard({
+  running,
+  result,
+  error,
+  onScore,
+}: ScoreNewJobsCardProps) {
+  const [count, setCount] = useState('5')
 
   function handleCountChange(event: ChangeEvent<HTMLInputElement>) {
-    const parsed = Number(event.target.value)
-    if (Number.isNaN(parsed)) {
-      setCount(1)
-      return
-    }
-    setCount(Math.min(20, Math.max(1, Math.trunc(parsed))))
+    setCount(event.target.value)
+  }
+
+  function handleCountBlur() {
+    setCount(String(clampLimit(count)))
+  }
+
+  function handleScore() {
+    const limit = clampLimit(count)
+    setCount(String(limit))
+    onScore(limit)
   }
 
   return (
@@ -41,17 +61,22 @@ export default function ScoreNewJobsCard({ result }: ScoreNewJobsCardProps) {
             max={20}
             value={count}
             onChange={handleCountChange}
+            onBlur={handleCountBlur}
             className="mt-1 w-24 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-900 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100"
           />
         </div>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700"
+          onClick={handleScore}
+          disabled={running}
+          className="inline-flex items-center gap-2 rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
         >
           <Sparkles size={16} />
-          Score
+          {running ? 'Scoring...' : 'Score'}
         </button>
       </div>
+
+      {error !== null && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       {result !== null && (
         <div className="mt-5 border-t border-neutral-200 pt-5">

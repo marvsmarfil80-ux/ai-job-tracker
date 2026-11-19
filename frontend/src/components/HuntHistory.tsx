@@ -5,6 +5,9 @@ import type { HuntList, HuntRun, HuntStep } from '../types'
 
 type HuntHistoryProps = {
   huntList: HuntList
+  onPrevious: () => void
+  onNext: () => void
+  loading: boolean
 }
 
 const runStatusClasses: Record<HuntRun['status'], string> = {
@@ -24,7 +27,12 @@ function stepLabel(source: string): string {
   return source === 'email' ? 'Email sync' : sourceLabel(source)
 }
 
-export default function HuntHistory({ huntList }: HuntHistoryProps) {
+export default function HuntHistory({
+  huntList,
+  onPrevious,
+  onNext,
+  loading,
+}: HuntHistoryProps) {
   const start = huntList.items.length === 0 ? huntList.offset : huntList.offset + 1
   const end = huntList.offset + huntList.items.length
   const nextDisabled = huntList.offset + huntList.items.length >= huntList.total
@@ -87,7 +95,8 @@ export default function HuntHistory({ huntList }: HuntHistoryProps) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={huntList.offset === 0}
+            onClick={onPrevious}
+            disabled={loading || huntList.offset === 0}
             className="inline-flex items-center gap-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:text-neutral-400"
           >
             <ChevronLeft size={16} />
@@ -95,7 +104,8 @@ export default function HuntHistory({ huntList }: HuntHistoryProps) {
           </button>
           <button
             type="button"
-            disabled={nextDisabled}
+            onClick={onNext}
+            disabled={loading || nextDisabled}
             className="inline-flex items-center gap-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:text-neutral-400"
           >
             Next

@@ -137,3 +137,8 @@ export type ScoreRunResult = {
   cap: { limit: number; used_before: number; remaining_after: number }
   title_filter: { checked: number; filtered_out: number; passed: number }
 }
+
+export type SourceList = {
+  items: SourceInfo[]
+  total: number
+}
