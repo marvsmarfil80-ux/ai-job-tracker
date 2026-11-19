@@ -339,7 +339,7 @@ Daily cap: at most 5 resume draft calls per UTC day. This is a constant in the c
 
 What is NOT removed: the code does not remove your name, employer names, school names, job titles or other details. The redacted text is sent to Groq (a third party). If that is not acceptable for a given file, do not use this endpoint; you can still write the profile by hand with `PUT /profile`.
 
-Logging: each AI call writes one line to `system_events` (component `resume`): `Resume draft call` at level `info`, or `Groq call failed: <reason>`. Counts only (pages, character count, skill count) may appear in the response. The PDF text, the AI answer and the skill names are never logged or stored.
+Logging: each AI call writes one line to `system_events` (component `resume`): `Resume draft call` at level `info`, or `Groq call failed: <reason>`. Counts only (pages, character count, skill count) may appear in the response. The PDF text, the AI answer and the skill names are never logged or stored. When a call returns no valid skills, one extra `Resume skill check` event is written with the AI skill count and dropped skill count only; this event is not counted toward any cap.
 
 ## Applications
 

@@ -301,6 +301,11 @@ def run_resume_draft(
         log_event(db, "info", RESUME_OK_MESSAGE)
         skills, dropped_skills = _validate_skills(parsed.skills, prompt_text)
         if not skills:
+            log_event(
+                db,
+                "warning",
+                f"Resume skill check: no valid skills (ai_returned={len(parsed.skills)}, dropped={len(dropped_skills)})",
+            )
             _reject(422, "No skills could be found in this PDF.")
         return {
             "skills": skills,

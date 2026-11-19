@@ -10,9 +10,10 @@ from pypdf import PdfWriter
 from sqlalchemy import text
 
 from app.config import get_settings
-from app.db import engine
+from app.db import SessionLocal, engine
 from app.main import app
 from app.services.groq_client import get_groq_client, mock_handler
+from app.services.resume import count_resume_calls_today
 from tests.test_scoring import (
     FAKE_KEY,
     Script,
@@ -580,7 +581,14 @@ def test_no_valid_skill_is_422_and_counts_as_a_call(client, headers, groq, monke
     assert response.status_code == 422
     assert response.json()["detail"] == NO_SKILLS_MESSAGE
     assert script.calls == 1
-    assert event_rows() == [("info", "Resume draft call")]
+    rows = event_rows()
+    assert len(rows) == 2
+    assert rows[0] == ("info", "Resume draft call")
+    level, message = rows[1]
+    assert level == "warning"
+    assert message.startswith("Resume skill check")
+    with SessionLocal() as db:
+        assert count_resume_calls_today(db) == 1
 
 
 def test_no_skills_does_not_change_profile(client, headers, groq, monkeypatch):
@@ -813,6 +821,60 @@ def test_pdf_text_never_leaks_on_invalid_output(client, headers, groq, monkeypat
     for _level, message in event_rows():
         assert message in ALLOWED_EVENT_MESSAGES
         assert marker not in message
+
+
+def skill_check_messages():
+    return [
+        message
+        for _level, message in event_rows()
+        if message.startswith("Resume skill check")
+    ]
+
+
+def test_empty_ai_skills_writes_one_skill_check_event_with_zero_counts(
+    client, headers, groq, monkeypatch
+):
+    patch_reader(monkeypatch, "Only Ruby is used.")
+    groq(Script(raw(json.dumps({"skills": []}))))
+    response = post_pdf(client, headers, make_pdf_bytes())
+    assert response.status_code == 422
+    assert response.json()["detail"] == NO_SKILLS_MESSAGE
+    rows = skill_check_messages()
+    assert len(rows) == 1
+    assert "ai_returned=0" in rows[0]
+    assert "dropped=0" in rows[0]
+
+
+def test_all_dropped_skills_write_correct_counts(client, headers, groq, monkeypatch):
+    patch_reader(monkeypatch, "Only Ruby is used.")
+    groq(Script(raw(json.dumps({"skills": ["Kubernetes", "Java"]}))))
+    response = post_pdf(client, headers, make_pdf_bytes())
+    assert response.status_code == 422
+    rows = skill_check_messages()
+    assert len(rows) == 1
+    assert "ai_returned=2" in rows[0]
+    assert "dropped=2" in rows[0]
+
+
+def test_skill_check_event_is_not_counted_toward_the_resume_cap(
+    client, headers, groq, monkeypatch
+):
+    patch_reader(monkeypatch, "Only Ruby is used.")
+    groq(Script(raw(json.dumps({"skills": ["Kubernetes", "Java"]}))))
+    response = post_pdf(client, headers, make_pdf_bytes())
+    assert response.status_code == 422
+    with SessionLocal() as db:
+        assert count_resume_calls_today(db) == 1
+
+
+def test_successful_draft_writes_no_skill_check_event(
+    client, headers, groq, monkeypatch
+):
+    patch_reader(monkeypatch, "Python and Docker are used.")
+    groq(Script(raw(json.dumps({"skills": ["Python", "Docker"]}))))
+    response = post_pdf(client, headers, make_pdf_bytes())
+    assert response.status_code == 200
+    assert skill_check_messages() == []
 
 
 def test_router_is_covered_by_auth_inventory():
