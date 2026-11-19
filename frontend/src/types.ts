@@ -89,3 +89,51 @@ export type ResumeDraftOut = {
   dropped_skills: number | string[]
   warnings: string[]
 }
+
+export type HuntStep = {
+  source: string
+  status: 'running' | 'done' | 'error' | 'skipped'
+  found: number
+  new: number
+  message: string | null
+}
+
+export type HuntRun = {
+  id: number
+  trigger: string
+  status: 'running' | 'done' | 'error'
+  started_at: string
+  finished_at: string | null
+  total_new: number
+  steps: HuntStep[]
+}
+
+export type HuntList = {
+  items: HuntRun[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type SourceInfo = {
+  id: number
+  name: string
+  badge: string
+  enabled: boolean
+  keywords: string[]
+  max_runs_per_day: number | null
+  last_run_at: string | null
+  effective_max_runs_per_day: number
+  runs_today: number
+}
+
+export type ScoreRunResult = {
+  requested: number
+  attempted: number
+  scored: number
+  failed: number
+  errored: number
+  stopped_reason: string | null
+  cap: { limit: number; used_before: number; remaining_after: number }
+  title_filter: { checked: number; filtered_out: number; passed: number }
+}
