@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from app.services.scoring_prompt import FENCE_PATTERN
 
-PROMPT_VERSION = "resume-v1"
+PROMPT_VERSION = "resume-v2"
 MIN_SKILL_CHARS = 1
 MAX_SKILL_CHARS = 50
 
@@ -21,12 +21,15 @@ SYSTEM_PROMPT = (
     "Reply with ONLY one JSON object and nothing else, with exactly one key: "
     '{"skills": ["<skill>", ...]} '
     "Rules: "
-    "list only skills that appear word-for-word in the text. "
+    "list every skill that is explicitly written in the text. "
+    "A skill can be technical, a tool or software, an office or computer skill, a soft skill, or a language. "
+    "Items in a bulleted list under a heading such as Skills are skills. "
+    "Do not include the bullet symbol. "
+    "Copy each skill exactly as it is written in the text, as a short label of at most 50 characters. "
     "Never infer, guess, or invent a skill. "
     "If a skill is not written in the text, do not include it. "
-    "Write each skill as a short label, spelled exactly as it is written in the text. "
     "Do not include the same skill twice. "
-    "Return an empty list if the text has no skills."
+    "Return an empty list only if the text has no skills."
 )
 
 

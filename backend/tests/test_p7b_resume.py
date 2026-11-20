@@ -14,6 +14,7 @@ from app.db import SessionLocal, engine
 from app.main import app
 from app.services.groq_client import get_groq_client, mock_handler
 from app.services.resume import count_resume_calls_today
+from app.services.resume_prompt import PROMPT_VERSION, SYSTEM_PROMPT, build_messages
 from tests.test_scoring import (
     FAKE_KEY,
     Script,
@@ -881,3 +882,37 @@ def test_router_is_covered_by_auth_inventory():
     from tests.test_p12c_hardening import OPERATIONS
 
     assert ("post", "/profile/resume/draft") in OPERATIONS
+
+
+def test_prompt_version_is_resume_v2():
+    assert PROMPT_VERSION == "resume-v2"
+
+
+def test_system_prompt_covers_all_skill_kinds():
+    assert "extract_resume_skills" in SYSTEM_PROMPT
+    assert "Never infer, guess, or invent a skill." in SYSTEM_PROMPT
+    assert "soft skill" in SYSTEM_PROMPT
+
+
+def test_build_messages_uses_the_system_prompt_and_delimiter():
+    messages = build_messages("Skills: Teamwork")
+    assert messages[0] == {"role": "system", "content": SYSTEM_PROMPT}
+    assert "<resume_text>" in messages[1]["content"]
+
+
+def test_soft_skills_in_the_text_are_returned(client, headers, groq, monkeypatch):
+    patch_reader(monkeypatch, "Skills: Teamwork and Typing")
+    groq(Script(raw(json.dumps({"skills": ["Teamwork", "Typing"]}))))
+    response = post_pdf(client, headers, make_pdf_bytes())
+    assert response.status_code == 200
+    assert response.json()["skills"] == ["Teamwork", "Typing"]
+
+
+def test_skill_not_in_the_text_is_still_dropped(client, headers, groq, monkeypatch):
+    patch_reader(monkeypatch, "Skills: Teamwork and Typing")
+    groq(Script(raw(json.dumps({"skills": ["Teamwork", "Leadership"]}))))
+    response = post_pdf(client, headers, make_pdf_bytes())
+    assert response.status_code == 200
+    data = response.json()
+    assert data["skills"] == ["Teamwork"]
+    assert data["dropped_skills"] == ["Leadership"]
