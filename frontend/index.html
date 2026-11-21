@@ -5,6 +5,26 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Job Tracker</title>
+    <script>
+      (function () {
+        var dark = false;
+        try {
+          var stored = localStorage.getItem('theme');
+          if (stored === 'dark' || stored === 'light') {
+            dark = stored === 'dark';
+          } else {
+            dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          }
+        } catch (error) {
+          try {
+            dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          } catch (inner) {
+            dark = false;
+          }
+        }
+        document.documentElement.classList.toggle('dark', dark);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

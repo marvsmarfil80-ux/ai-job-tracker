@@ -1,50 +1,38 @@
 import { NavLink } from 'react-router-dom'
-import {
-  Bell,
-  Briefcase,
-  ClipboardList,
-  Clock,
-  LayoutDashboard,
-  Mail,
-  Search,
-  Settings,
-  User,
-} from 'lucide-react'
-
-const items = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/job-hunter', label: 'Job Hunter', icon: Search },
-  { to: '/jobs', label: 'Jobs to Apply', icon: Briefcase },
-  { to: '/applications', label: 'Applications', icon: ClipboardList },
-  { to: '/notifications', label: 'Notifications', icon: Bell },
-  { to: '/follow-ups', label: 'Follow-ups', icon: Clock },
-  { to: '/emails', label: 'Application Emails', icon: Mail },
-  { to: '/profile', label: 'My Profile', icon: User },
-  { to: '/settings', label: 'Settings', icon: Settings },
-]
+import { Radar } from 'lucide-react'
+import { navItems } from '../lib/nav'
+import ThemeToggle from './ThemeToggle'
 
 export default function Sidebar() {
   return (
-    <nav className="flex w-64 shrink-0 flex-col gap-1 border-r border-neutral-200 bg-white p-4">
-      <div className="mb-4 px-3 text-lg font-semibold text-neutral-900">
-        AI Job Tracker
+    <aside className="flex w-[242px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-3.5 pb-4 pt-6">
+      <div className="flex items-center gap-3 px-3 pb-6">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent-soft-ink">
+          <Radar size={18} aria-hidden="true" />
+        </span>
+        <span className="text-base font-semibold text-ink">AI Job Tracker</span>
       </div>
-      {items.map(({ to, label, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          className={({ isActive }) =>
-            `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
-              isActive
-                ? 'bg-accent-50 text-accent-700'
-                : 'text-neutral-600 hover:bg-neutral-100'
-            }`
-          }
-        >
-          <Icon size={18} />
-          {label}
-        </NavLink>
-      ))}
-    </nav>
+      <nav aria-label="Main" className="flex flex-col gap-1">
+        {navItems.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              `flex min-h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ${
+                isActive
+                  ? 'bg-accent-soft text-accent-soft-ink'
+                  : 'text-ink-muted hover:bg-sunken hover:text-ink'
+              }`
+            }
+          >
+            <Icon size={18} aria-hidden="true" />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+      <div className="mt-auto pt-4">
+        <ThemeToggle />
+      </div>
+    </aside>
   )
 }
