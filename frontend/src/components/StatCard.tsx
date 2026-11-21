@@ -10,15 +10,13 @@ type StatCardProps = {
 
 export default function StatCard({ label, value, icon: Icon }: StatCardProps) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-neutral-500">{label}</p>
-          <p className="mt-2 text-3xl font-semibold text-neutral-900">{value}</p>
-        </div>
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-50 text-accent-600">
-          <Icon size={20} />
-        </span>
+    <div className="flex items-center gap-4 rounded-card border border-line bg-surface p-5 shadow-card">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink">
+        <Icon size={20} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm text-ink-muted">{label}</p>
+        <p className="mt-1 text-3xl font-semibold text-ink">{value}</p>
       </div>
     </div>
   )

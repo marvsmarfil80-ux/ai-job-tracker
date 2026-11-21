@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CalendarCheck, Clock, FileText, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import RecommendedJobRow from '../components/RecommendedJobRow'
 import SkeletonBlock from '../components/SkeletonBlock'
@@ -61,40 +62,49 @@ export default function Dashboard() {
     setReloadKey((key) => key + 1)
   }
 
+  const header = (
+    <PageHeader
+      eyebrow="Overview"
+      title="Dashboard"
+      description="A summary of your applications, follow-ups and discovered jobs."
+    />
+  )
+
   if (status === 'loading') {
     return (
       <div aria-busy="true">
-        <h1 className="text-2xl font-semibold text-neutral-900">Dashboard</h1>
+        {header}
 
-        <div className="mt-6 grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4 min-[1050px]:grid-cols-4">
           {[0, 1, 2, 3].map((index) => (
-            <div key={index} className="rounded-lg border border-neutral-200 bg-white p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <SkeletonBlock className="h-5 w-28" />
-                  <SkeletonBlock className="mt-2 h-9 w-16" />
-                </div>
-                <SkeletonBlock className="h-10 w-10" />
+            <div
+              key={index}
+              className="flex items-center gap-4 rounded-card border border-line bg-surface p-5 shadow-card"
+            >
+              <SkeletonBlock className="h-10 w-10 shrink-0" />
+              <div>
+                <SkeletonBlock className="h-5 w-28" />
+                <SkeletonBlock className="mt-2 h-9 w-16" />
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-5">
+        <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-2">
-              <h2 className="font-semibold text-neutral-900">AI Recommended Jobs</h2>
+              <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
               <SkeletonBlock className="h-4 w-14" />
             </div>
             <Link
               to="/jobs"
-              className="text-sm font-medium text-accent-600 hover:text-accent-700"
+              className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
             >
               View all
             </Link>
           </div>
 
-          <div className="mt-2 divide-y divide-neutral-200">
+          <div className="mt-2 divide-y divide-line">
             {[0, 1, 2, 3, 4].map((index) => (
               <div key={index} className="flex items-start justify-between gap-4 py-4">
                 <div className="min-w-0 flex-1">
@@ -114,8 +124,8 @@ export default function Dashboard() {
   if (status === 'error' || !summary || !jobs) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Dashboard</h1>
-        <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
+        {header}
+        <div className="rounded-card border border-line bg-surface shadow-card">
           <ErrorState
             message={errorText || 'Could not load the dashboard.'}
             onRetry={handleRetry}
@@ -127,9 +137,9 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-neutral-900">Dashboard</h1>
+      {header}
 
-      <div className="mt-6 grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 min-[1050px]:grid-cols-4">
         <StatCard
           label="Total Applications"
           value={summary.total_applications}
@@ -144,15 +154,15 @@ export default function Dashboard() {
         <StatCard label="Jobs Discovered" value={summary.jobs_discovered} icon={Search} />
       </div>
 
-      <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <h2 className="font-semibold text-neutral-900">AI Recommended Jobs</h2>
-            <span className="text-sm text-neutral-500">{summary.recommended_jobs} total</span>
+            <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
+            <span className="text-sm text-ink-muted">{summary.recommended_jobs} total</span>
           </div>
           <Link
             to="/jobs"
-            className="text-sm font-medium text-accent-600 hover:text-accent-700"
+            className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
           >
             View all
           </Link>
@@ -164,7 +174,7 @@ export default function Dashboard() {
             hint="Score new jobs from Job Hunter to see recommendations here."
           />
         ) : (
-          <div className="mt-2 divide-y divide-neutral-200">
+          <div className="mt-2 divide-y divide-line">
             {jobs.items.map((job) => (
               <RecommendedJobRow key={job.id} job={job} />
             ))}
