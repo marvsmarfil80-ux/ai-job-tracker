@@ -66,9 +66,9 @@ export default function ResumeDraftCard({
         : String(draft.dropped_skills)
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-5">
-      <h2 className="font-semibold text-neutral-900">Resume draft</h2>
-      <p className="mt-1 text-sm text-neutral-500">
+    <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+      <h2 className="text-base font-semibold text-ink">Resume draft</h2>
+      <p className="mt-1 text-sm text-ink-muted">
         Your PDF text is sent to Groq, a third party, after emails, phone numbers and contact
         lines are removed. Names, employers, schools and job titles are not removed.
       </p>
@@ -80,7 +80,7 @@ export default function ResumeDraftCard({
           accept="application/pdf,.pdf"
           onChange={handleFileChange}
           disabled={busy}
-          className="block text-sm text-neutral-600 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200"
+          className="block text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-sunken file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-line"
         />
         <button
           type="button"
@@ -88,41 +88,41 @@ export default function ResumeDraftCard({
             if (selectedFile) onCreate(selectedFile)
           }}
           disabled={!selectedFile || busy}
-          className="rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
+          className="min-h-9 rounded-lg bg-accent-600 px-4 text-sm font-medium text-white transition-colors duration-150 enabled:hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-subtle"
         >
           Create draft
         </button>
       </div>
 
       {busy && (
-        <p className="mt-2 text-sm text-neutral-600">
+        <p className="mt-2 text-sm text-ink-muted">
           Reading your PDF and asking Groq. This can take a while.
         </p>
       )}
       {error && (
         <>
-          <p className="mt-2 text-sm text-red-600">{error.detail}</p>
+          <p className="mt-2 text-sm text-err-ink">{error.detail}</p>
           {error.status === 429 && error.detail === 'Daily resume draft limit reached.' && (
-            <p className="mt-1 text-sm text-neutral-600">
+            <p className="mt-1 text-sm text-ink-muted">
               Resume drafts are limited to 5 per day (UTC), shared with job scoring.
             </p>
           )}
         </>
       )}
-      {fileError && <p className="mt-2 text-sm text-red-600">{fileError}</p>}
+      {fileError && <p className="mt-2 text-sm text-err-ink">{fileError}</p>}
       {selectedFile && (
-        <p className="mt-2 text-sm text-neutral-600">
+        <p className="mt-2 text-sm text-ink-muted">
           {selectedFile.name} ({formatFileSize(selectedFile.size)})
         </p>
       )}
 
       {draft !== null && (
-        <div className="mt-5 border-t border-neutral-200 pt-5">
+        <div className="mt-5 border-t border-line pt-5">
           <div className="flex flex-wrap gap-1.5">
             {draft.skills.map((skill, index) => (
               <span
                 key={`${skill}-${index}`}
-                className="rounded-md bg-accent-50 px-2.5 py-1 text-sm font-medium text-accent-700"
+                className="rounded-lg bg-accent-soft px-2.5 py-1 text-sm font-medium text-accent-soft-ink"
               >
                 {skill}
               </span>
@@ -131,70 +131,70 @@ export default function ResumeDraftCard({
 
           <dl className="mt-4 grid grid-cols-4 gap-3 text-sm">
             <div>
-              <dt className="text-neutral-500">Pages</dt>
-              <dd className="mt-1 font-semibold text-neutral-900">{draft.pages}</dd>
+              <dt className="text-ink-muted">Pages</dt>
+              <dd className="mt-1 font-semibold text-ink">{draft.pages}</dd>
             </div>
             <div>
-              <dt className="text-neutral-500">Extracted chars</dt>
-              <dd className="mt-1 font-semibold text-neutral-900">{draft.extracted_chars}</dd>
+              <dt className="text-ink-muted">Extracted chars</dt>
+              <dd className="mt-1 font-semibold text-ink">{draft.extracted_chars}</dd>
             </div>
             <div>
-              <dt className="text-neutral-500">Truncated</dt>
-              <dd className="mt-1 font-semibold text-neutral-900">
+              <dt className="text-ink-muted">Truncated</dt>
+              <dd className="mt-1 font-semibold text-ink">
                 {draft.truncated ? 'Yes' : 'No'}
               </dd>
             </div>
             <div>
-              <dt className="text-neutral-500">Dropped skills</dt>
-              <dd className="mt-1 font-semibold text-neutral-900">{droppedSkills}</dd>
+              <dt className="text-ink-muted">Dropped skills</dt>
+              <dd className="mt-1 font-semibold text-ink">{droppedSkills}</dd>
             </div>
           </dl>
 
           <div className="mt-4 grid grid-cols-5 gap-2 text-sm">
-            <div className="rounded-md bg-neutral-50 p-2">
-              <p className="text-xs text-neutral-500">Emails</p>
-              <p className="mt-1 font-semibold text-neutral-900">{draft.redactions.emails}</p>
+            <div className="rounded-lg bg-sunken p-2">
+              <p className="text-xs text-ink-muted">Emails</p>
+              <p className="mt-1 font-semibold text-ink">{draft.redactions.emails}</p>
             </div>
-            <div className="rounded-md bg-neutral-50 p-2">
-              <p className="text-xs text-neutral-500">Phones</p>
-              <p className="mt-1 font-semibold text-neutral-900">{draft.redactions.phones}</p>
+            <div className="rounded-lg bg-sunken p-2">
+              <p className="text-xs text-ink-muted">Phones</p>
+              <p className="mt-1 font-semibold text-ink">{draft.redactions.phones}</p>
             </div>
-            <div className="rounded-md bg-neutral-50 p-2">
-              <p className="text-xs text-neutral-500">Lines</p>
-              <p className="mt-1 font-semibold text-neutral-900">{draft.redactions.lines}</p>
+            <div className="rounded-lg bg-sunken p-2">
+              <p className="text-xs text-ink-muted">Lines</p>
+              <p className="mt-1 font-semibold text-ink">{draft.redactions.lines}</p>
             </div>
-            <div className="rounded-md bg-neutral-50 p-2">
-              <p className="text-xs text-neutral-500">URLs</p>
-              <p className="mt-1 font-semibold text-neutral-900">{draft.redactions.urls}</p>
+            <div className="rounded-lg bg-sunken p-2">
+              <p className="text-xs text-ink-muted">URLs</p>
+              <p className="mt-1 font-semibold text-ink">{draft.redactions.urls}</p>
             </div>
-            <div className="rounded-md bg-neutral-50 p-2">
-              <p className="text-xs text-neutral-500">Address lines</p>
-              <p className="mt-1 font-semibold text-neutral-900">
+            <div className="rounded-lg bg-sunken p-2">
+              <p className="text-xs text-ink-muted">Address lines</p>
+              <p className="mt-1 font-semibold text-ink">
                 {draft.redactions.address_lines}
               </p>
             </div>
           </div>
 
           {draft.warnings.length > 0 && (
-            <ul className="mt-4 list-disc space-y-1 pl-4 text-sm text-neutral-600">
+            <ul className="mt-4 list-disc space-y-1 pl-4 text-sm text-ink-muted">
               {draft.warnings.map((warning, index) => (
                 <li key={index}>{warning}</li>
               ))}
             </ul>
           )}
 
-          <div className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-neutral-50 p-3 text-sm text-neutral-700">
+          <div className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-sunken p-3 text-sm text-ink">
             {draft.draft_content}
           </div>
 
           <button
             type="button"
             onClick={onAddDraft}
-            className="mt-4 rounded-md border border-accent-600 px-3 py-1.5 text-sm font-medium text-accent-700 hover:bg-accent-50"
+            className="mt-4 min-h-9 rounded-lg border border-accent-ink px-4 text-sm font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-soft"
           >
             Add draft to profile text
           </button>
-          {addMessage && <p className="mt-2 text-sm text-red-600">{addMessage}</p>}
+          {addMessage && <p className="mt-2 text-sm text-err-ink">{addMessage}</p>}
         </div>
       )}
     </div>

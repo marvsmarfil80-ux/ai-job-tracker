@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import PageHeader from '../components/PageHeader'
 import ProfileEditor from '../components/ProfileEditor'
 import GroqViewPanel from '../components/GroqViewPanel'
 import ResumeDraftCard from '../components/ResumeDraftCard'
@@ -130,11 +131,19 @@ export default function MyProfile() {
     setAddMessage(null)
   }
 
+  const header = (
+    <PageHeader
+      eyebrow="Profile"
+      title="My Profile"
+      description="Edit your profile text and draft skills from a resume PDF."
+    />
+  )
+
   if (loadError !== null) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">My Profile</h1>
-        <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
+        {header}
+        <div className="rounded-card border border-line bg-surface shadow-card">
           <ErrorState message={loadError} onRetry={handleRetry} />
         </div>
       </div>
@@ -144,16 +153,16 @@ export default function MyProfile() {
   if (profile === null) {
     return (
       <div aria-busy="true">
-        <h1 className="text-2xl font-semibold text-neutral-900">My Profile</h1>
+        {header}
 
-        <div className="mt-6 grid grid-cols-3 gap-6">
-          <div className="col-span-2 rounded-lg border border-neutral-200 bg-white p-5">
+        <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-3">
+          <div className="rounded-card border border-line bg-surface p-5 shadow-card min-[1050px]:col-span-2">
             <SkeletonBlock className="h-5 w-40" />
             <SkeletonBlock className="mt-4 h-64 w-full" />
             <SkeletonBlock className="mt-3 h-4 w-24" />
             <SkeletonBlock className="mt-4 h-8 w-24" />
           </div>
-          <div className="rounded-lg border border-neutral-200 bg-white p-5">
+          <div className="rounded-card border border-line bg-surface p-5 shadow-card">
             <SkeletonBlock className="h-5 w-32" />
             <SkeletonBlock className="mt-4 h-4 w-full" />
             <SkeletonBlock className="mt-2 h-4 w-5/6" />
@@ -162,7 +171,7 @@ export default function MyProfile() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-5">
+        <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
           <SkeletonBlock className="h-5 w-36" />
           <SkeletonBlock className="mt-3 h-4 w-3/4" />
           <SkeletonBlock className="mt-4 h-9 w-64" />
@@ -173,10 +182,10 @@ export default function MyProfile() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-neutral-900">My Profile</h1>
+      {header}
 
-      <div className="mt-6 grid grid-cols-3 gap-6">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-3">
+        <div className="min-[1050px]:col-span-2">
           <ProfileEditor
             value={text}
             onChange={(value) => {
