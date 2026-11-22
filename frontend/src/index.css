@@ -8,19 +8,20 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-accent-50: #f0fdfa;
-  --color-accent-100: #ccfbf1;
-  --color-accent-300: #5eead4;
-  --color-accent-400: #2dd4bf;
-  --color-accent-500: #14b8a6;
-  --color-accent-600: #0f766e;
-  --color-accent-700: #115e59;
+  --color-accent-50: #eef2ff;
+  --color-accent-100: #e0e7ff;
+  --color-accent-300: #a5b4fc;
+  --color-accent-400: #818cf8;
+  --color-accent-500: #6366f1;
+  --color-accent-600: #5145e5;
+  --color-accent-700: #4338ca;
   --radius-card: 14px;
 }
 
 :root {
   color-scheme: light;
   --t-page: #f8fafc;
+  --t-chrome: #ffffff;
   --t-surface: #ffffff;
   --t-sunken: #f1f5f9;
   --t-ink: #0f172a;
@@ -28,10 +29,10 @@
   --t-ink-subtle: #64748b;
   --t-line: #e2e8f0;
   --t-control: #8392a5;
-  --t-focus: #0f766e;
-  --t-accent-ink: #0f766e;
-  --t-accent-soft: #f0fdfa;
-  --t-accent-soft-ink: #115e59;
+  --t-focus: #5145e5;
+  --t-accent-ink: #5145e5;
+  --t-accent-soft: #eef2ff;
+  --t-accent-soft-ink: #4338ca;
   --t-ok-soft: #dcfce7;
   --t-ok-ink: #166534;
   --t-warn-soft: #fef3c7;
@@ -47,18 +48,19 @@
 
 .dark {
   color-scheme: dark;
-  --t-page: #0b1120;
-  --t-surface: #111827;
-  --t-sunken: #1e293b;
-  --t-ink: #f1f5f9;
+  --t-page: #0c111b;
+  --t-chrome: #111827;
+  --t-surface: #172033;
+  --t-sunken: #1e2a41;
+  --t-ink: #f8fafc;
   --t-ink-muted: #a7b3c6;
   --t-ink-subtle: #94a3b8;
-  --t-line: #1f2a3d;
-  --t-control: #64748b;
-  --t-focus: #2dd4bf;
-  --t-accent-ink: #2dd4bf;
-  --t-accent-soft: #042f2e;
-  --t-accent-soft-ink: #2dd4bf;
+  --t-line: #273449;
+  --t-control: #7b8ca3;
+  --t-focus: #818cf8;
+  --t-accent-ink: #a5b4fc;
+  --t-accent-soft: #1e1b4b;
+  --t-accent-soft-ink: #a5b4fc;
   --t-ok-soft: #052e16;
   --t-ok-ink: #86efac;
   --t-warn-soft: #422006;
@@ -67,13 +69,14 @@
   --t-err-ink: #fca5a5;
   --t-info-soft: #172554;
   --t-info-ink: #93c5fd;
-  --t-idle-soft: #1e293b;
+  --t-idle-soft: #1e2a41;
   --t-idle-ink: #cbd5e1;
   --t-shadow: none;
 }
 
 @theme inline {
   --color-page: var(--t-page);
+  --color-chrome: var(--t-chrome);
   --color-surface: var(--t-surface);
   --color-sunken: var(--t-sunken);
   --color-ink: var(--t-ink);

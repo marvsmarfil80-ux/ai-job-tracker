@@ -5,7 +5,7 @@ import ThemeToggle from './ThemeToggle'
 
 export default function Sidebar() {
   return (
-    <aside className="flex w-[242px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-3.5 pb-4 pt-6">
+    <aside className="flex w-[242px] shrink-0 flex-col overflow-y-auto border-r border-line bg-chrome px-3.5 pb-4 pt-6">
       <div className="flex items-center gap-3 px-3 pb-6">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent-soft-ink">
           <Radar size={18} aria-hidden="true" />

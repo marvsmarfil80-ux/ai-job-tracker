@@ -12,7 +12,7 @@ export default function Shell() {
     <div className="flex h-full bg-page text-ink">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-[72px] shrink-0 items-center border-b border-line bg-surface px-[42px]">
+        <header className="flex h-[72px] shrink-0 items-center border-b border-line bg-chrome px-[42px]">
           <nav aria-label="Breadcrumb">
             <ol className="flex items-center gap-2 text-sm">
               <li className="text-ink-muted">AI Job Tracker</li>
