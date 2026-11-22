@@ -3,6 +3,10 @@ import RunHuntCard from '../components/RunHuntCard'
 import ScoreNewJobsCard from '../components/ScoreNewJobsCard'
 import SourcesList from '../components/SourcesList'
 import HuntHistory from '../components/HuntHistory'
+import LatestRunCard from '../components/LatestRunCard'
+import ActionNotices from '../components/ActionNotices'
+import ScoreResultPanel from '../components/ScoreResultPanel'
+import PageHeader from '../components/PageHeader'
 import SkeletonBlock from '../components/SkeletonBlock'
 import ErrorState from '../components/ErrorState'
 import { api } from '../lib/api'
@@ -27,6 +31,7 @@ export default function JobHunter() {
   const [runMessage, setRunMessage] = useState<string | null>(null)
   const [runNotice, setRunNotice] = useState<string | null>(null)
   const [newestBusy, setNewestBusy] = useState(false)
+  const [newestRun, setNewestRun] = useState<HuntRun | null>(null)
 
   const [scoreRunning, setScoreRunning] = useState(false)
   const [scoreResult, setScoreResult] = useState<ScoreRunResult | null>(null)
@@ -51,6 +56,7 @@ export default function JobHunter() {
             (newest.status === 'running' ||
               newest.steps.some((step) => step.status === 'running')),
         )
+        setNewestRun(newest ?? null)
         setLoadError(null)
       } catch (error) {
         if (cancelled) return
@@ -141,11 +147,17 @@ export default function JobHunter() {
     }
   }
 
+  const headerProps = {
+    eyebrow: 'Automation workspace',
+    title: 'Job Hunter',
+    description: 'Search remote job feeds, then let AI score only the new jobs.',
+  }
+
   if (loadError !== null) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Job Hunter</h1>
-        <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
+        <PageHeader {...headerProps} />
+        <div className="rounded-card border border-line bg-surface shadow-card">
           <ErrorState message={loadError} onRetry={handleRetry} />
         </div>
       </div>
@@ -155,30 +167,23 @@ export default function JobHunter() {
   if (huntList === null) {
     return (
       <div aria-busy="true">
-        <h1 className="text-2xl font-semibold text-neutral-900">Job Hunter</h1>
+        <PageHeader {...headerProps} />
 
-        <div className="mt-6 grid grid-cols-2 gap-6">
+        <div className="grid gap-6 min-[1050px]:grid-cols-[1.25fr_0.85fr]">
           {[0, 1].map((index) => (
-            <div key={index} className="rounded-lg border border-neutral-200 bg-white p-5">
-              <SkeletonBlock className="h-5 w-32" />
-              <SkeletonBlock className="mt-2 h-4 w-64" />
-              <SkeletonBlock className="mt-4 h-8 w-24" />
+            <div key={index} className="rounded-card border border-line bg-surface p-5 shadow-card">
+              <SkeletonBlock className="h-4 w-24" />
+              <SkeletonBlock className="mt-3 h-5 w-40" />
+              <SkeletonBlock className="mt-4 h-16 w-full" />
+              <SkeletonBlock className="mt-2 h-16 w-full" />
             </div>
           ))}
         </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-6">
-          <div className="col-span-1 rounded-lg border border-neutral-200 bg-white p-5">
-            <SkeletonBlock className="h-5 w-24" />
-            <SkeletonBlock className="mt-4 h-16 w-full" />
-            <SkeletonBlock className="mt-2 h-16 w-full" />
-          </div>
-          <div className="col-span-2 rounded-lg border border-neutral-200 bg-white p-5">
-            <SkeletonBlock className="h-5 w-32" />
-            {[0, 1, 2].map((index) => (
-              <SkeletonBlock key={index} className="mt-4 h-20 w-full" />
-            ))}
-          </div>
+        <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
+          <SkeletonBlock className="h-4 w-32" />
+          <SkeletonBlock className="mt-4 h-14 w-full" />
+          <SkeletonBlock className="mt-2 h-14 w-full" />
         </div>
       </div>
     )
@@ -186,36 +191,49 @@ export default function JobHunter() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-neutral-900">Job Hunter</h1>
+      <PageHeader
+        {...headerProps}
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <ScoreNewJobsCard running={scoreRunning} onScore={handleScore} />
+            <RunHuntCard busy={newestBusy} running={runRunning} onRun={handleRun} />
+          </div>
+        }
+      />
 
-      <div className="mt-6 grid grid-cols-2 gap-6">
-        <RunHuntCard
-          busy={newestBusy}
-          running={runRunning}
-          message={runMessage}
-          notice={runNotice}
-          onRun={handleRun}
-        />
-        <ScoreNewJobsCard
-          running={scoreRunning}
-          result={scoreResult}
-          error={scoreError}
-          onScore={handleScore}
+      <p className="-mt-3 mb-6 text-xs text-ink-subtle">
+        Run Hunt: Fetches job feeds only. No AI is used. Score New Jobs: Uses AI (Groq). Counts toward the daily limit.
+      </p>
+
+      <ActionNotices
+        busy={newestBusy}
+        running={runRunning}
+        runMessage={runMessage}
+        runNotice={runNotice}
+        scoreRunning={scoreRunning}
+        scoreError={scoreError}
+      />
+
+      <ScoreResultPanel result={scoreResult} />
+
+      <div
+        className={
+          newestRun !== null
+            ? 'grid gap-6 min-[1050px]:grid-cols-[1.25fr_0.85fr]'
+            : 'grid gap-6'
+        }
+      >
+        {newestRun !== null && <LatestRunCard run={newestRun} />}
+        <HuntHistory
+          huntList={huntList}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          loading={loading}
         />
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-6">
-        <div className="col-span-1">
-          <SourcesList sources={sources} />
-        </div>
-        <div className="col-span-2">
-          <HuntHistory
-            huntList={huntList}
-            onPrevious={handlePrevious}
-            onNext={handleNext}
-            loading={loading}
-          />
-        </div>
+      <div className="mt-6">
+        <SourcesList sources={sources} />
       </div>
     </div>
   )
