@@ -15,7 +15,7 @@ export default function Shell() {
         <header className="flex h-[72px] shrink-0 items-center border-b border-line bg-chrome px-[42px]">
           <nav aria-label="Breadcrumb">
             <ol className="flex items-center gap-2 text-sm">
-              <li className="text-ink-muted">AI Job Tracker</li>
+              <li className="text-ink-muted">Workspace</li>
               {current && (
                 <>
                   <li aria-hidden="true" className="text-ink-subtle">

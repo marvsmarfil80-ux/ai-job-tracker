@@ -131,18 +131,16 @@ export default function MyProfile() {
     setAddMessage(null)
   }
 
-  const header = (
-    <PageHeader
-      eyebrow="Profile"
-      title="My Profile"
-      description="Edit your profile text and draft skills from a resume PDF."
-    />
-  )
+  const headerProps = {
+    eyebrow: 'AI context',
+    title: 'My Profile',
+    description: 'The AI uses this text as your source of truth. It never invents qualifications.',
+  }
 
   if (loadError !== null) {
     return (
       <div>
-        {header}
+        <PageHeader {...headerProps} />
         <div className="rounded-card border border-line bg-surface shadow-card">
           <ErrorState message={loadError} onRetry={handleRetry} />
         </div>
@@ -153,39 +151,53 @@ export default function MyProfile() {
   if (profile === null) {
     return (
       <div aria-busy="true">
-        {header}
+        <PageHeader {...headerProps} />
 
-        <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-3">
-          <div className="rounded-card border border-line bg-surface p-5 shadow-card min-[1050px]:col-span-2">
-            <SkeletonBlock className="h-5 w-40" />
-            <SkeletonBlock className="mt-4 h-64 w-full" />
-            <SkeletonBlock className="mt-3 h-4 w-24" />
-            <SkeletonBlock className="mt-4 h-8 w-24" />
+        <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-[1.2fr_0.8fr]">
+          <div className="flex min-w-0 flex-col gap-6">
+            <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+              <SkeletonBlock className="h-5 w-40" />
+              <SkeletonBlock className="mt-4 h-64 w-full" />
+            </div>
+            <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+              <SkeletonBlock className="h-5 w-32" />
+              <SkeletonBlock className="mt-4 h-4 w-full" />
+              <SkeletonBlock className="mt-2 h-4 w-5/6" />
+              <SkeletonBlock className="mt-2 h-4 w-4/6" />
+              <SkeletonBlock className="mt-4 h-24 w-full" />
+            </div>
           </div>
-          <div className="rounded-card border border-line bg-surface p-5 shadow-card">
-            <SkeletonBlock className="h-5 w-32" />
-            <SkeletonBlock className="mt-4 h-4 w-full" />
-            <SkeletonBlock className="mt-2 h-4 w-5/6" />
-            <SkeletonBlock className="mt-2 h-4 w-4/6" />
-            <SkeletonBlock className="mt-4 h-24 w-full" />
+          <div className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card">
+            <SkeletonBlock className="h-5 w-36" />
+            <SkeletonBlock className="mt-3 h-4 w-3/4" />
+            <SkeletonBlock className="mt-4 h-9 w-64" />
           </div>
-        </div>
-
-        <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
-          <SkeletonBlock className="h-5 w-36" />
-          <SkeletonBlock className="mt-3 h-4 w-3/4" />
-          <SkeletonBlock className="mt-4 h-9 w-64" />
         </div>
       </div>
     )
   }
 
+  const trimmedLength = text.trim().length
+  const saveDisabled = trimmedLength === 0 || trimmedLength > 2000 || saving
+
   return (
     <div>
-      {header}
+      <PageHeader
+        {...headerProps}
+        actions={
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saveDisabled}
+            className="min-h-9 rounded-lg bg-accent-600 px-5 text-sm font-medium text-white transition-colors duration-150 enabled:hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-subtle"
+          >
+            Save
+          </button>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-3">
-        <div className="min-[1050px]:col-span-2">
+      <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-[1.2fr_0.8fr]">
+        <div className="flex min-w-0 flex-col gap-6">
           <ProfileEditor
             value={text}
             onChange={(value) => {
@@ -194,30 +206,27 @@ export default function MyProfile() {
             }}
             updatedAt={profile.updated_at}
             message={saveError}
-            onSave={handleSave}
-            saving={saving}
             dirty={text !== profile.content}
             showSaved={justSaved}
             showEmptyNotice={profile.content.trim() === ''}
           />
+          <GroqViewPanel
+            view={profile.groq_view}
+            redactions={profile.redactions}
+            warnings={profile.warnings}
+          />
         </div>
-        <GroqViewPanel
-          view={profile.groq_view}
-          redactions={profile.redactions}
-          warnings={profile.warnings}
-        />
-      </div>
-
-      <div className="mt-6">
-        <ResumeDraftCard
-          draft={draft}
-          busy={draftBusy}
-          error={draftError}
-          onCreate={handleCreateDraft}
-          onClearError={() => setDraftError(null)}
-          onAddDraft={handleAddDraft}
-          addMessage={addMessage}
-        />
+        <div className="min-w-0">
+          <ResumeDraftCard
+            draft={draft}
+            busy={draftBusy}
+            error={draftError}
+            onCreate={handleCreateDraft}
+            onClearError={() => setDraftError(null)}
+            onAddDraft={handleAddDraft}
+            addMessage={addMessage}
+          />
+        </div>
       </div>
     </div>
   )

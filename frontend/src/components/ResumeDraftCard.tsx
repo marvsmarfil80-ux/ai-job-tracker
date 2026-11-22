@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Upload } from 'lucide-react'
 import type { ChangeEvent } from 'react'
 import type { ResumeDraftOut } from '../types'
 
@@ -67,31 +68,41 @@ export default function ResumeDraftCard({
 
   return (
     <div className="rounded-card border border-line bg-surface p-5 shadow-card">
-      <h2 className="text-base font-semibold text-ink">Resume draft</h2>
+      <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
+        Suggestion only
+      </p>
+      <h2 className="mt-1 text-base font-semibold text-ink">Resume draft</h2>
       <p className="mt-1 text-sm text-ink-muted">
         Your PDF text is sent to Groq, a third party, after emails, phone numbers and contact
         lines are removed. Names, employers, schools and job titles are not removed.
       </p>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <input
-          aria-label="Resume PDF"
-          type="file"
-          accept="application/pdf,.pdf"
-          onChange={handleFileChange}
-          disabled={busy}
-          className="block text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-sunken file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-line"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            if (selectedFile) onCreate(selectedFile)
-          }}
-          disabled={!selectedFile || busy}
-          className="min-h-9 rounded-lg bg-accent-600 px-4 text-sm font-medium text-white transition-colors duration-150 enabled:hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-subtle"
-        >
-          Create draft
-        </button>
+      <div className="mt-4 rounded-xl border border-dashed border-control bg-sunken p-4 text-center">
+        <div className="flex flex-col items-center gap-1">
+          <Upload size={20} className="text-accent-ink" aria-hidden="true" />
+          <p className="text-sm font-semibold text-accent-ink">Upload a resume PDF</p>
+          <p className="text-xs text-ink-muted">Up to 2 MiB · 5 drafts per day</p>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+          <input
+            aria-label="Resume PDF"
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={handleFileChange}
+            disabled={busy}
+            className="block min-w-0 text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-surface file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-line"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedFile) onCreate(selectedFile)
+            }}
+            disabled={!selectedFile || busy}
+            className="min-h-9 rounded-lg bg-accent-600 px-4 text-sm font-medium text-white transition-colors duration-150 enabled:hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-subtle"
+          >
+            Create draft
+          </button>
+        </div>
       </div>
 
       {busy && (
@@ -118,6 +129,9 @@ export default function ResumeDraftCard({
 
       {draft !== null && (
         <div className="mt-5 border-t border-line pt-5">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-ink-subtle">
+            Skills found
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {draft.skills.map((skill, index) => (
               <span
@@ -129,7 +143,7 @@ export default function ResumeDraftCard({
             ))}
           </div>
 
-          <dl className="mt-4 grid grid-cols-4 gap-3 text-sm">
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div>
               <dt className="text-ink-muted">Pages</dt>
               <dd className="mt-1 font-semibold text-ink">{draft.pages}</dd>
@@ -150,7 +164,7 @@ export default function ResumeDraftCard({
             </div>
           </dl>
 
-          <div className="mt-4 grid grid-cols-5 gap-2 text-sm">
+          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div className="rounded-lg bg-sunken p-2">
               <p className="text-xs text-ink-muted">Emails</p>
               <p className="mt-1 font-semibold text-ink">{draft.redactions.emails}</p>

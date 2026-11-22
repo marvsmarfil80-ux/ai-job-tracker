@@ -91,10 +91,16 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
-          <div className="flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
-              <SkeletonBlock className="h-4 w-14" />
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
+                AI signal
+              </p>
+              <div className="mt-1 flex items-baseline gap-2">
+                <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
+                <SkeletonBlock className="h-4 w-14" />
+              </div>
+              <p className="mt-1 text-sm text-ink-muted">Top matches waiting for your decision.</p>
             </div>
             <Link
               to="/jobs"
@@ -106,7 +112,8 @@ export default function Dashboard() {
 
           <div className="mt-2 divide-y divide-line">
             {[0, 1, 2, 3, 4].map((index) => (
-              <div key={index} className="flex items-start justify-between gap-4 py-4">
+              <div key={index} className="flex items-start gap-4 py-4">
+                <SkeletonBlock className="h-7 w-7 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <SkeletonBlock className="h-6 w-64" />
                   <SkeletonBlock className="mt-1 h-5 w-48" />
@@ -145,20 +152,37 @@ export default function Dashboard() {
           value={summary.total_applications}
           icon={FileText}
         />
-        <StatCard label="Interviews" value={summary.interviews} icon={CalendarCheck} />
         <StatCard
           label="Pending Follow-ups"
           value={summary.pending_follow_ups}
           icon={Clock}
+          tone="warn"
         />
-        <StatCard label="Jobs Discovered" value={summary.jobs_discovered} icon={Search} />
+        <StatCard
+          label="Interviews"
+          value={summary.interviews}
+          icon={CalendarCheck}
+          tone="info"
+        />
+        <StatCard
+          label="Jobs Discovered"
+          value={summary.jobs_discovered}
+          icon={Search}
+          tone="ok"
+        />
       </div>
 
       <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
-            <span className="text-sm text-ink-muted">{summary.recommended_jobs} total</span>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
+              AI signal
+            </p>
+            <div className="mt-1 flex items-baseline gap-2">
+              <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
+              <span className="text-sm text-ink-muted">{summary.recommended_jobs} total</span>
+            </div>
+            <p className="mt-1 text-sm text-ink-muted">Top matches waiting for your decision.</p>
           </div>
           <Link
             to="/jobs"
@@ -175,8 +199,8 @@ export default function Dashboard() {
           />
         ) : (
           <div className="mt-2 divide-y divide-line">
-            {jobs.items.map((job) => (
-              <RecommendedJobRow key={job.id} job={job} />
+            {jobs.items.map((job, index) => (
+              <RecommendedJobRow key={job.id} job={job} rank={index + 1} />
             ))}
           </div>
         )}

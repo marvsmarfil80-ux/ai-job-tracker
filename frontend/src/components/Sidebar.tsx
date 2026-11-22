@@ -7,11 +7,17 @@ export default function Sidebar() {
   return (
     <aside className="flex w-[242px] shrink-0 flex-col overflow-y-auto border-r border-line bg-chrome px-3.5 pb-4 pt-6">
       <div className="flex items-center gap-3 px-3 pb-6">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent-soft-ink">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-600 text-white shadow-card">
           <Radar size={18} aria-hidden="true" />
         </span>
-        <span className="text-base font-semibold text-ink">AI Job Tracker</span>
+        <div className="min-w-0">
+          <p className="text-base font-semibold leading-tight text-ink">AI Job Tracker</p>
+          <p className="text-xs text-ink-subtle">Personal workspace</p>
+        </div>
       </div>
+      <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-widest text-ink-subtle">
+        Workspace
+      </p>
       <nav aria-label="Main" className="flex flex-col gap-1">
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
@@ -30,7 +36,11 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="mt-auto pt-4">
+      <div className="mt-auto flex flex-col gap-3 pt-4">
+        <div className="rounded-xl border border-line bg-sunken p-3">
+          <p className="text-xs font-semibold text-ink">Local workspace</p>
+          <p className="mt-1 text-xs text-ink-muted">Asia/Manila · read-only Gmail</p>
+        </div>
         <ThemeToggle />
       </div>
     </aside>
