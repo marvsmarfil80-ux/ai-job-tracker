@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Upload } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ShieldCheck, Upload } from 'lucide-react'
 import type { ChangeEvent } from 'react'
 import type { ResumeDraftOut } from '../types'
+import StatusBadge from './StatusBadge'
 
 type ResumeDraftCardProps = {
   draft: ResumeDraftOut | null
@@ -30,6 +31,7 @@ export default function ResumeDraftCard({
 }: ResumeDraftCardProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     onClearError()
@@ -67,31 +69,42 @@ export default function ResumeDraftCard({
         : String(draft.dropped_skills)
 
   return (
-    <div className="rounded-card border border-line bg-surface p-5 shadow-card">
-      <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
-        Suggestion only
-      </p>
-      <h2 className="mt-1 text-base font-semibold text-ink">Resume draft</h2>
-      <p className="mt-1 text-sm text-ink-muted">
-        Your PDF text is sent to Groq, a third party, after emails, phone numbers and contact
-        lines are removed. Names, employers, schools and job titles are not removed.
-      </p>
+    <div className="h-full rounded-card border border-line bg-surface p-6 shadow-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
+            Suggestion only
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-ink">Resume PDF draft</h2>
+        </div>
+        {draft !== null && <StatusBadge tone="ok">Draft ready</StatusBadge>}
+      </div>
 
-      <div className="mt-4 rounded-xl border border-dashed border-control bg-sunken p-4 text-center">
+      <div className="mt-4 rounded-xl border border-dashed border-control bg-sunken px-4 py-6 text-center">
         <div className="flex flex-col items-center gap-1">
           <Upload size={20} className="text-accent-ink" aria-hidden="true" />
           <p className="text-sm font-semibold text-accent-ink">Upload a resume PDF</p>
           <p className="text-xs text-ink-muted">Up to 2 MiB · 5 drafts per day</p>
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <input
+            ref={inputRef}
             aria-label="Resume PDF"
             type="file"
             accept="application/pdf,.pdf"
             onChange={handleFileChange}
             disabled={busy}
-            className="block min-w-0 text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-surface file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-line"
+            tabIndex={-1}
+            className="sr-only"
           />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            className="min-h-9 rounded-lg border border-control bg-surface px-4 text-sm font-medium text-ink transition-colors duration-150 enabled:hover:bg-line disabled:cursor-not-allowed disabled:text-ink-subtle"
+          >
+            Choose PDF
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -127,6 +140,14 @@ export default function ResumeDraftCard({
         </p>
       )}
 
+      <div className="mt-4 flex items-start gap-2 rounded-lg bg-sunken p-3">
+        <ShieldCheck size={16} className="mt-0.5 shrink-0 text-accent-ink" aria-hidden="true" />
+        <p className="text-sm text-ink-muted">
+          Your PDF text is sent to Groq, a third party, after emails, phone numbers and contact
+          lines are removed. Names, employers, schools and job titles are not removed.
+        </p>
+      </div>
+
       {draft !== null && (
         <div className="mt-5 border-t border-line pt-5">
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-ink-subtle">
@@ -154,9 +175,7 @@ export default function ResumeDraftCard({
             </div>
             <div>
               <dt className="text-ink-muted">Truncated</dt>
-              <dd className="mt-1 font-semibold text-ink">
-                {draft.truncated ? 'Yes' : 'No'}
-              </dd>
+              <dd className="mt-1 font-semibold text-ink">{draft.truncated ? 'Yes' : 'No'}</dd>
             </div>
             <div>
               <dt className="text-ink-muted">Dropped skills</dt>
@@ -183,9 +202,7 @@ export default function ResumeDraftCard({
             </div>
             <div className="rounded-lg bg-sunken p-2">
               <p className="text-xs text-ink-muted">Address lines</p>
-              <p className="mt-1 font-semibold text-ink">
-                {draft.redactions.address_lines}
-              </p>
+              <p className="mt-1 font-semibold text-ink">{draft.redactions.address_lines}</p>
             </div>
           </div>
 
@@ -201,13 +218,15 @@ export default function ResumeDraftCard({
             {draft.draft_content}
           </div>
 
-          <button
-            type="button"
-            onClick={onAddDraft}
-            className="mt-4 min-h-9 rounded-lg border border-accent-ink px-4 text-sm font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-soft"
-          >
-            Add draft to profile text
-          </button>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onAddDraft}
+              className="min-h-9 rounded-lg border border-accent-ink px-4 text-sm font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-soft"
+            >
+              Add draft to profile text
+            </button>
+          </div>
           {addMessage && <p className="mt-2 text-sm text-err-ink">{addMessage}</p>}
         </div>
       )}

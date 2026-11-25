@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Save } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import ProfileEditor from '../components/ProfileEditor'
 import GroqViewPanel from '../components/GroqViewPanel'
@@ -153,25 +154,22 @@ export default function MyProfile() {
       <div aria-busy="true">
         <PageHeader {...headerProps} />
 
-        <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-[1.2fr_0.8fr]">
-          <div className="flex min-w-0 flex-col gap-6">
-            <div className="rounded-card border border-line bg-surface p-5 shadow-card">
-              <SkeletonBlock className="h-5 w-40" />
-              <SkeletonBlock className="mt-4 h-64 w-full" />
-            </div>
-            <div className="rounded-card border border-line bg-surface p-5 shadow-card">
-              <SkeletonBlock className="h-5 w-32" />
-              <SkeletonBlock className="mt-4 h-4 w-full" />
-              <SkeletonBlock className="mt-2 h-4 w-5/6" />
-              <SkeletonBlock className="mt-2 h-4 w-4/6" />
-              <SkeletonBlock className="mt-4 h-24 w-full" />
-            </div>
+        <div className="grid grid-cols-1 items-stretch gap-6 min-[1050px]:grid-cols-[3fr_2fr]">
+          <div className="min-w-0 rounded-card border border-line bg-surface p-6 shadow-card">
+            <SkeletonBlock className="h-5 w-40" />
+            <SkeletonBlock className="mt-4 h-72 w-full" />
           </div>
-          <div className="min-w-0 rounded-card border border-line bg-surface p-5 shadow-card">
+          <div className="min-w-0 rounded-card border border-line bg-surface p-6 shadow-card">
             <SkeletonBlock className="h-5 w-36" />
             <SkeletonBlock className="mt-3 h-4 w-3/4" />
-            <SkeletonBlock className="mt-4 h-9 w-64" />
+            <SkeletonBlock className="mt-4 h-36 w-full" />
           </div>
+        </div>
+        <div className="mt-6 rounded-card border border-line bg-surface p-6 shadow-card">
+          <SkeletonBlock className="h-5 w-32" />
+          <SkeletonBlock className="mt-4 h-4 w-full" />
+          <SkeletonBlock className="mt-2 h-4 w-5/6" />
+          <SkeletonBlock className="mt-4 h-16 w-full" />
         </div>
       </div>
     )
@@ -189,44 +187,43 @@ export default function MyProfile() {
             type="button"
             onClick={handleSave}
             disabled={saveDisabled}
-            className="min-h-9 rounded-lg bg-accent-600 px-5 text-sm font-medium text-white transition-colors duration-150 enabled:hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-subtle"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-accent-600 px-5 text-sm font-semibold text-white shadow-card transition-colors duration-150 enabled:hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-subtle"
           >
+            <Save size={16} aria-hidden="true" />
             Save
           </button>
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 min-[1050px]:grid-cols-[1.2fr_0.8fr]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <ProfileEditor
-            value={text}
-            onChange={(value) => {
-              setText(value)
-              setJustSaved(false)
-            }}
-            updatedAt={profile.updated_at}
-            message={saveError}
-            dirty={text !== profile.content}
-            showSaved={justSaved}
-            showEmptyNotice={profile.content.trim() === ''}
-          />
-          <GroqViewPanel
-            view={profile.groq_view}
-            redactions={profile.redactions}
-            warnings={profile.warnings}
-          />
-        </div>
-        <div className="min-w-0">
-          <ResumeDraftCard
-            draft={draft}
-            busy={draftBusy}
-            error={draftError}
-            onCreate={handleCreateDraft}
-            onClearError={() => setDraftError(null)}
-            onAddDraft={handleAddDraft}
-            addMessage={addMessage}
-          />
-        </div>
+      <div className="grid grid-cols-1 items-stretch gap-6 min-[1050px]:grid-cols-[3fr_2fr]">
+        <ProfileEditor
+          value={text}
+          onChange={(value) => {
+            setText(value)
+            setJustSaved(false)
+          }}
+          updatedAt={profile.updated_at}
+          message={saveError}
+          dirty={text !== profile.content}
+          showSaved={justSaved}
+          showEmptyNotice={profile.content.trim() === ''}
+        />
+        <ResumeDraftCard
+          draft={draft}
+          busy={draftBusy}
+          error={draftError}
+          onCreate={handleCreateDraft}
+          onClearError={() => setDraftError(null)}
+          onAddDraft={handleAddDraft}
+          addMessage={addMessage}
+        />
+      </div>
+      <div className="mt-6">
+        <GroqViewPanel
+          view={profile.groq_view}
+          redactions={profile.redactions}
+          warnings={profile.warnings}
+        />
       </div>
     </div>
   )
