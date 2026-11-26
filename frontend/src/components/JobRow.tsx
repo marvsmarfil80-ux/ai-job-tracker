@@ -5,7 +5,7 @@ import type { JobOut } from '../types'
 import type { Tone } from '../lib/hunt'
 import { statusText } from '../lib/hunt'
 import { sourceLabel } from '../lib/sources'
-import { initialOf, jobGridColumns, pipelineLabel, verdictTone } from '../lib/jobs'
+import { initialOf, jobGridColumns, pipelineLabel, verdictTone, workModeLabel } from '../lib/jobs'
 import { formatDate, formatDateTime } from '../lib/time'
 import StatusBadge from './StatusBadge'
 import MarkAppliedForm from './MarkAppliedForm'
@@ -13,25 +13,31 @@ import MarkAppliedForm from './MarkAppliedForm'
 type JobRowProps = {
   job: JobOut
   expanded: boolean
+  busy: boolean
+  error: string | null
   onToggle: () => void
+  onOpen: () => void
   onDismiss: () => void
   onRestore: () => void
-  onApplied: () => void
+  onApply: (notes: string) => Promise<boolean>
 }
 
 const outlineButton =
-  'inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border border-control bg-surface px-2.5 text-xs font-medium text-ink hover:bg-sunken'
+  'inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-control bg-surface px-3 text-sm font-medium text-ink enabled:hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50'
 
 const primaryButton =
-  'inline-flex h-8 items-center rounded-lg bg-accent-600 px-2.5 text-xs font-medium text-white hover:bg-accent-700'
+  'inline-flex h-9 items-center rounded-lg bg-accent-600 px-3 text-sm font-medium text-white enabled:hover:bg-accent-700 disabled:cursor-not-allowed disabled:opacity-50'
 
 export default function JobRow({
   job,
   expanded,
+  busy,
+  error,
   onToggle,
+  onOpen,
   onDismiss,
   onRestore,
-  onApplied,
+  onApply,
 }: JobRowProps) {
   const [showForm, setShowForm] = useState(false)
   const detailsId = `job-details-${job.id}`
@@ -53,28 +59,26 @@ export default function JobRow({
     onToggle()
   }
 
-  function handleConfirm() {
-    setShowForm(false)
-    onApplied()
+  async function handleConfirm(notes: string) {
+    const ok = await onApply(notes)
+    if (ok) setShowForm(false)
   }
 
   return (
     <div>
-      <div className={`${jobGridColumns} min-h-[76px] items-start px-4 py-4`}>
+      <div className={`${jobGridColumns} min-h-[88px] items-start px-4 py-5`}>
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-sm font-semibold text-accent-soft-ink">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-sm font-bold text-accent-soft-ink">
             {initialOf(job)}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink">{job.title}</p>
-            <p className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-[13px] text-ink-muted">
+            <p className="truncate text-sm font-bold text-ink">{job.title}</p>
+            <p className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden text-xs text-ink-muted">
               <span className="truncate">{job.company ?? 'Company not listed'}</span>
               <span className="shrink-0 text-ink-subtle" aria-hidden="true">
                 ·
               </span>
-              <span className="shrink-0 whitespace-nowrap">
-                via {sourceLabel(job.source)}
-              </span>
+              <span className="shrink-0 whitespace-nowrap">via {sourceLabel(job.source)}</span>
               {job.location && (
                 <>
                   <span className="shrink-0 text-ink-subtle" aria-hidden="true">
@@ -89,14 +93,9 @@ export default function JobRow({
 
         <div className="min-w-0">
           {job.pipeline_status === 'new' ? (
-            <p className="text-[13px] text-ink-muted">Not scored yet</p>
+            <p className="text-sm text-ink-muted">Not scored yet</p>
           ) : job.pipeline_status === 'filtered_out' || job.pipeline_status === 'error' ? (
-            <div className="flex min-w-0 flex-col items-start gap-1">
-              <StatusBadge tone={pipelineTone}>{pipelineLabel(job.pipeline_status)}</StatusBadge>
-              {job.filter_reason && (
-                <p className="w-full truncate text-[13px] text-ink-muted">{job.filter_reason}</p>
-              )}
-            </div>
+            <p className="w-full truncate text-xs text-ink-muted">{job.filter_reason ?? '—'}</p>
           ) : (
             <div className="flex min-w-0 flex-col items-start gap-1">
               {job.score !== null && (
@@ -105,13 +104,9 @@ export default function JobRow({
                 </p>
               )}
               {job.verdict && (
-                <StatusBadge tone={verdictTone(job.verdict)}>
-                  {statusText(job.verdict)}
-                </StatusBadge>
+                <StatusBadge tone={verdictTone(job.verdict)}>{statusText(job.verdict)}</StatusBadge>
               )}
-              {job.reason && (
-                <p className="w-full truncate text-[13px] text-ink-muted">{job.reason}</p>
-              )}
+              {job.reason && <p className="w-full truncate text-xs text-ink-muted">{job.reason}</p>}
             </div>
           )}
         </div>
@@ -120,10 +115,10 @@ export default function JobRow({
           {job.work_mode ? (
             <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium text-ink-muted">
               <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
-              {job.work_mode}
+              {workModeLabel(job.work_mode)}
             </span>
           ) : (
-            <span className="text-[13px] text-ink-subtle">—</span>
+            <span className="text-sm text-ink-subtle">—</span>
           )}
         </div>
 
@@ -132,7 +127,7 @@ export default function JobRow({
           {hasApplication ? (
             <StatusBadge tone="ok">Applied</StatusBadge>
           ) : job.opened_at ? (
-            <p className="w-full truncate text-[13px] text-ink-muted">
+            <p className="w-full truncate text-xs text-ink-muted">
               Opened {formatDate(job.opened_at)}
             </p>
           ) : null}
@@ -145,7 +140,7 @@ export default function JobRow({
             aria-label={`More actions for ${job.title}`}
             aria-expanded={expanded}
             aria-controls={detailsId}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
           >
             <MoreHorizontal size={18} aria-hidden="true" />
           </button>
@@ -154,17 +149,15 @@ export default function JobRow({
 
       {expanded && (
         <div id={detailsId} className="mb-4 rounded-lg bg-sunken p-4">
-          <div className="space-y-2.5 text-[13px] text-ink-muted">
+          <div className="space-y-2.5 text-sm text-ink-muted">
             {job.description && (
               <p className="whitespace-pre-line text-ink-muted">{job.description}</p>
             )}
-            <p>
-              {job.opened_at ? `Opened ${formatDateTime(job.opened_at)}` : 'Not opened yet'}
-            </p>
+            <p>{job.opened_at ? `Opened ${formatDateTime(job.opened_at)}` : 'Not opened yet'}</p>
             {job.filter_reason && <p>Filter reason: {job.filter_reason}</p>}
             {job.red_flags && job.red_flags.length > 0 && (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
+                <p className="text-xs font-bold uppercase tracking-widest text-ink-muted">
                   Red flags
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5">
@@ -174,17 +167,7 @@ export default function JobRow({
                 </ul>
               </div>
             )}
-            <p>
-              <a
-                href={job.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Open listing link for ${job.title} in a new tab`}
-                className="break-all text-accent-ink underline-offset-4 hover:underline"
-              >
-                {job.url}
-              </a>
-            </p>
+            <p className="break-all text-ink-subtle">{job.url}</p>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -192,6 +175,7 @@ export default function JobRow({
               href={job.url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={onOpen}
               aria-label={`Open listing for ${job.title} in a new tab`}
               className={outlineButton}
             >
@@ -203,6 +187,7 @@ export default function JobRow({
               <button
                 type="button"
                 onClick={onRestore}
+                disabled={busy}
                 aria-label={`Restore ${job.title}`}
                 className={outlineButton}
               >
@@ -213,6 +198,7 @@ export default function JobRow({
                 <button
                   type="button"
                   onClick={onDismiss}
+                  disabled={busy}
                   aria-label={`Dismiss ${job.title}`}
                   className={outlineButton}
                 >
@@ -225,17 +211,18 @@ export default function JobRow({
               <Link
                 to="/applications"
                 aria-label={`View applications for ${job.title}`}
-                className="text-xs font-medium text-accent-ink underline-offset-4 hover:underline"
+                className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
               >
                 View applications
               </Link>
             ) : dismissed ? (
-              <p className="text-xs text-ink-muted">This job is dismissed. Restore it first.</p>
+              <p className="text-sm text-ink-muted">This job is dismissed. Restore it first.</p>
             ) : (
               <button
                 type="button"
                 onClick={() => setShowForm(true)}
-                aria-label={`Open mark applied form for ${job.title}`}
+                disabled={busy}
+                aria-label={`Mark as applied: ${job.title}`}
                 className={primaryButton}
               >
                 Mark as applied
@@ -246,9 +233,16 @@ export default function JobRow({
           {showForm && !hasApplication && !dismissed && (
             <MarkAppliedForm
               jobTitle={job.title}
+              busy={busy}
               onConfirm={handleConfirm}
               onCancel={() => setShowForm(false)}
             />
+          )}
+
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-err-ink">
+              {error}
+            </p>
           )}
         </div>
       )}

@@ -53,7 +53,7 @@ function FilterChip({ label, ariaLabel, value, options, onChange }: FilterChipPr
   return (
     <label className="relative flex h-10 shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-sunken px-2 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus">
       <span className="whitespace-nowrap text-xs font-medium text-ink-subtle">{label}</span>
-      <span className="flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-ink">
+      <span className="flex items-center gap-1 whitespace-nowrap text-sm font-semibold text-ink">
         {selected.label}
         <ChevronDown size={12} className="text-ink-subtle" aria-hidden="true" />
       </span>
@@ -93,9 +93,9 @@ export default function JobsFilterBar({ filters, onChange, onClear }: JobsFilter
           type="search"
           value={filters.search}
           onChange={(event) => onChange({ ...filters, search: event.target.value })}
-          placeholder="Search title, company, or source"
+          placeholder="Search title or company"
           aria-label="Search jobs"
-          className="h-10 w-full rounded-lg bg-sunken pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-subtle"
+          className="h-10 w-full rounded-lg bg-sunken pl-9 pr-3 text-sm text-ink placeholder:text-ink-subtle"
         />
       </div>
 
@@ -127,7 +127,7 @@ export default function JobsFilterBar({ filters, onChange, onClear }: JobsFilter
         type="button"
         aria-pressed={filters.openedOnly}
         onClick={() => onChange({ ...filters, openedOnly: !filters.openedOnly })}
-        className={`h-10 shrink-0 whitespace-nowrap rounded-lg px-2.5 text-xs font-medium ${
+        className={`h-10 shrink-0 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium ${
           filters.openedOnly
             ? 'bg-accent-soft text-accent-soft-ink'
             : 'bg-sunken text-ink-muted hover:text-ink'
@@ -140,7 +140,7 @@ export default function JobsFilterBar({ filters, onChange, onClear }: JobsFilter
         <button
           type="button"
           onClick={onClear}
-          className="h-10 shrink-0 whitespace-nowrap px-1 text-xs font-medium text-accent-ink hover:underline"
+          className="h-10 shrink-0 whitespace-nowrap px-1 text-sm font-medium text-accent-ink hover:underline"
         >
           Clear filters
         </button>

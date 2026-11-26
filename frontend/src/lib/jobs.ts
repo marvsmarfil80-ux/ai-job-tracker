@@ -34,3 +34,8 @@ export function rangeText(offset: number, count: number, total: number): string 
   const end = offset + count
   return `Showing ${start}-${end} of ${total}`
 }
+
+export function workModeLabel(mode: string): string {
+  const spaced = mode.replace(/_/g, ' ').trim()
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
