@@ -1,4 +1,5 @@
 import { ChevronDown, Search } from 'lucide-react'
+import ChoiceMenu from './ChoiceMenu'
 
 export type JobFilters = {
   search: string
@@ -51,25 +52,28 @@ export function FilterChip({ label, ariaLabel, value, options, onChange }: Filte
   const selected = options.find((option) => option.value === value) ?? options[0]
 
   return (
-    <label className="relative flex h-10 shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-sunken px-2 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus">
-      <span className="whitespace-nowrap text-xs font-medium text-ink-subtle">{label}</span>
-      <span className="flex items-center gap-1 whitespace-nowrap text-sm font-semibold text-ink">
-        {selected.label}
-        <ChevronDown size={12} className="text-ink-subtle" aria-hidden="true" />
-      </span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-label={ariaLabel}
-        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <ChoiceMenu
+      options={options}
+      value={value}
+      menuLabel={ariaLabel}
+      triggerLabel={`${ariaLabel}: ${selected.label}`}
+      align="left"
+      triggerClassName="flex h-10 items-center gap-1 rounded-lg bg-sunken px-2"
+      triggerContent={(open) => (
+        <>
+          <span className="whitespace-nowrap text-xs font-medium text-ink-muted">{label}</span>
+          <span className="flex items-center gap-1 whitespace-nowrap text-sm font-semibold text-ink">
+            {selected.label}
+            <ChevronDown
+              size={12}
+              aria-hidden="true"
+              className={`text-ink-muted transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+            />
+          </span>
+        </>
+      )}
+      onSelect={onChange}
+    />
   )
 }
 
@@ -82,7 +86,7 @@ export default function JobsFilterBar({ filters, onChange, onClear }: JobsFilter
     filters.openedOnly
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-card border border-line bg-surface p-3 shadow-card min-[1280px]:flex-nowrap min-[1280px]:overflow-x-auto">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-card border border-line bg-surface p-3 shadow-card min-[1280px]:flex-nowrap">
       <div className="relative min-w-[120px] flex-1">
         <Search
           size={15}
