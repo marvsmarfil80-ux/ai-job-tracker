@@ -48,19 +48,19 @@
 
 .dark {
   color-scheme: dark;
-  --t-page: #0c111b;
-  --t-chrome: #111827;
-  --t-surface: #172033;
-  --t-sunken: #1e2a41;
-  --t-ink: #f8fafc;
-  --t-ink-muted: #a7b3c6;
-  --t-ink-subtle: #94a3b8;
-  --t-line: #273449;
-  --t-control: #7b8ca3;
-  --t-focus: #818cf8;
-  --t-accent-ink: #a5b4fc;
-  --t-accent-soft: #1e1b4b;
-  --t-accent-soft-ink: #a5b4fc;
+  --t-page: #0a0a0a;
+  --t-chrome: #111111;
+  --t-surface: #171717;
+  --t-sunken: #262626;
+  --t-ink: #fafafa;
+  --t-ink-muted: #a3a3a3;
+  --t-ink-subtle: #8f8f8f;
+  --t-line: #2e2e2e;
+  --t-control: #737373;
+  --t-focus: #d4d4d4;
+  --t-accent-ink: #e5e5e5;
+  --t-accent-soft: #262626;
+  --t-accent-soft-ink: #fafafa;
   --t-ok-soft: #052e16;
   --t-ok-ink: #86efac;
   --t-warn-soft: #422006;
@@ -69,8 +69,8 @@
   --t-err-ink: #fca5a5;
   --t-info-soft: #172554;
   --t-info-ink: #93c5fd;
-  --t-idle-soft: #1e2a41;
-  --t-idle-ink: #cbd5e1;
+  --t-idle-soft: #262626;
+  --t-idle-ink: #d4d4d4;
   --t-shadow: none;
 }
 
