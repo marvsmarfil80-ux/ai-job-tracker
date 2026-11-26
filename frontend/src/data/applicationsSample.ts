@@ -1,0 +1,132 @@
+import type { ApplicationDetail } from '../lib/applications'
+
+export const sampleApplications: ApplicationDetail[] = [
+  {
+    id: 418,
+    job_id: 116,
+    status: 'applied',
+    applied_at: '2026-11-25T02:30:00Z',
+    notes: null,
+    job: {
+      id: 116,
+      title: 'Junior Frontend Developer',
+      company: 'Orchard Lane',
+      url: 'https://weworkremotely.com/remote-jobs/orchard-lane-junior-frontend-developer',
+      source: 'weworkremotely',
+    },
+    events: [
+      { id: 5018, from_status: null, to_status: 'applied', changed_at: '2026-11-25T02:30:00Z' },
+    ],
+  },
+  {
+    id: 414,
+    job_id: 112,
+    status: 'under_review',
+    applied_at: '2026-11-24T05:10:00Z',
+    notes: 'Recruiter replied and asked for a portfolio link.',
+    job: {
+      id: 112,
+      title: 'UI Developer',
+      company: null,
+      url: 'https://remoteok.com/remote-jobs/ui-developer-4471',
+      source: 'remoteok',
+    },
+    events: [
+      { id: 5014, from_status: null, to_status: 'applied', changed_at: '2026-11-24T05:10:00Z' },
+      { id: 5015, from_status: 'applied', to_status: 'under_review', changed_at: '2026-11-25T08:00:00Z' },
+    ],
+  },
+  {
+    id: 415,
+    job_id: 113,
+    status: 'assessment',
+    applied_at: '2026-11-22T01:45:00Z',
+    notes: 'Take-home task due within five days.',
+    job: {
+      id: 113,
+      title: 'Web Developer',
+      company: 'Northgate Digital',
+      url: 'https://remotive.com/remote-jobs/software-dev/web-developer-northgate-2207',
+      source: 'remotive',
+    },
+    events: [
+      { id: 5012, from_status: null, to_status: 'applied', changed_at: '2026-11-22T01:45:00Z' },
+      { id: 5013, from_status: 'applied', to_status: 'assessment', changed_at: '2026-11-24T03:30:00Z' },
+    ],
+  },
+  {
+    id: 412,
+    job_id: 105,
+    status: 'interview',
+    applied_at: '2026-11-19T01:00:00Z',
+    notes: 'Technical interview scheduled with the engineering lead.',
+    job: {
+      id: 105,
+      title: 'Junior Web Developer',
+      company: 'Pinecrest Systems',
+      url: 'https://pinecrest.example.com/careers/junior-web-developer',
+      source: 'extension',
+    },
+    events: [
+      { id: 5001, from_status: null, to_status: 'applied', changed_at: '2026-11-19T01:00:00Z' },
+      { id: 5002, from_status: 'applied', to_status: 'under_review', changed_at: '2026-11-21T03:20:00Z' },
+      { id: 5003, from_status: 'under_review', to_status: 'interview', changed_at: '2026-11-24T06:45:00Z' },
+    ],
+  },
+  {
+    id: 416,
+    job_id: 114,
+    status: 'rejected',
+    applied_at: '2026-11-15T09:00:00Z',
+    notes: 'Polite rejection after the screening call.',
+    job: {
+      id: 114,
+      title: 'Software Engineer, Frontend',
+      company: 'Copperleaf',
+      url: 'https://www.linkedin.com/jobs/view/software-engineer-frontend-copperleaf-6634',
+      source: 'linkedin_email',
+    },
+    events: [
+      { id: 5004, from_status: null, to_status: 'applied', changed_at: '2026-11-15T09:00:00Z' },
+      { id: 5005, from_status: 'applied', to_status: 'under_review', changed_at: '2026-11-17T02:00:00Z' },
+      { id: 5006, from_status: 'under_review', to_status: 'rejected', changed_at: '2026-11-20T04:15:00Z' },
+    ],
+  },
+  {
+    id: 413,
+    job_id: 111,
+    status: 'offer',
+    applied_at: '2026-11-10T03:00:00Z',
+    notes: 'Offer received. Reviewing the contract terms.',
+    job: {
+      id: 111,
+      title: 'Frontend Engineer',
+      company: 'Brightlane Labs',
+      url: 'https://weworkremotely.com/remote-jobs/brightlane-labs-frontend-engineer',
+      source: 'weworkremotely',
+    },
+    events: [
+      { id: 5007, from_status: null, to_status: 'applied', changed_at: '2026-11-10T03:00:00Z' },
+      { id: 5008, from_status: 'applied', to_status: 'interview', changed_at: '2026-11-14T06:00:00Z' },
+      { id: 5009, from_status: 'interview', to_status: 'offer', changed_at: '2026-11-21T07:30:00Z' },
+    ],
+  },
+  {
+    id: 417,
+    job_id: 115,
+    status: 'withdrawn',
+    applied_at: '2026-11-08T08:20:00Z',
+    notes: 'Withdrew because the role moved to on-site only.',
+    job: {
+      id: 115,
+      title: 'React Native Developer',
+      company: 'Saltmarsh Apps',
+      url: 'https://saltmarsh.example.com/careers/react-native-developer',
+      source: 'manual',
+    },
+    events: [
+      { id: 5010, from_status: null, to_status: 'applied', changed_at: '2026-11-08T08:20:00Z' },
+      { id: 5011, from_status: 'applied', to_status: 'withdrawn', changed_at: '2026-11-12T01:10:00Z' },
+    ],
+  },
+]

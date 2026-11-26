@@ -14,7 +14,7 @@ type JobsFilterBarProps = {
   onClear: () => void
 }
 
-type Option = {
+export type Option = {
   value: string
   label: string
 }
@@ -47,7 +47,7 @@ const sortOptions: Option[] = [
   { value: 'score_desc', label: 'Score high to low' },
 ]
 
-function FilterChip({ label, ariaLabel, value, options, onChange }: FilterChipProps) {
+export function FilterChip({ label, ariaLabel, value, options, onChange }: FilterChipProps) {
   const selected = options.find((option) => option.value === value) ?? options[0]
 
   return (
