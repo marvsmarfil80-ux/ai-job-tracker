@@ -10,10 +10,18 @@ import { formatDate, formatDateTime } from '../lib/time'
 import StatusBadge from './StatusBadge'
 import MarkAppliedForm from './MarkAppliedForm'
 
+export type BusyAction = 'dismiss' | 'restore' | 'apply'
+
+export type BusyState = {
+  id: number
+  action: BusyAction
+}
+
 type JobRowProps = {
   job: JobOut
   expanded: boolean
-  busy: boolean
+  busyAction: BusyAction | null
+  disabled: boolean
   error: string | null
   onToggle: () => void
   onOpen: () => void
@@ -31,7 +39,8 @@ const primaryButton =
 export default function JobRow({
   job,
   expanded,
-  busy,
+  busyAction,
+  disabled,
   error,
   onToggle,
   onOpen,
@@ -187,22 +196,22 @@ export default function JobRow({
               <button
                 type="button"
                 onClick={onRestore}
-                disabled={busy}
-                aria-label={`Restore ${job.title}`}
+                disabled={disabled}
+                aria-label={busyAction === 'restore' ? `Restoring ${job.title}` : `Restore ${job.title}`}
                 className={outlineButton}
               >
-                Restore
+                {busyAction === 'restore' ? 'Restoring...' : 'Restore'}
               </button>
             ) : (
               !hasApplication && (
                 <button
                   type="button"
                   onClick={onDismiss}
-                  disabled={busy}
-                  aria-label={`Dismiss ${job.title}`}
+                  disabled={disabled}
+                  aria-label={busyAction === 'dismiss' ? `Dismissing ${job.title}` : `Dismiss ${job.title}`}
                   className={outlineButton}
                 >
-                  Dismiss
+                  {busyAction === 'dismiss' ? 'Dismissing...' : 'Dismiss'}
                 </button>
               )
             )}
@@ -221,7 +230,7 @@ export default function JobRow({
               <button
                 type="button"
                 onClick={() => setShowForm(true)}
-                disabled={busy}
+                disabled={disabled}
                 aria-label={`Mark as applied: ${job.title}`}
                 className={primaryButton}
               >
@@ -233,7 +242,8 @@ export default function JobRow({
           {showForm && !hasApplication && !dismissed && (
             <MarkAppliedForm
               jobTitle={job.title}
-              busy={busy}
+              disabled={disabled}
+              saving={busyAction === 'apply'}
               onConfirm={handleConfirm}
               onCancel={() => setShowForm(false)}
             />

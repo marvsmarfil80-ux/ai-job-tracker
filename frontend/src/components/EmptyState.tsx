@@ -1,11 +1,13 @@
+import type { ReactNode } from 'react'
 import { Inbox } from 'lucide-react'
 
 type EmptyStateProps = {
   title: string
   hint: string
+  action?: ReactNode
 }
 
-export default function EmptyState({ title, hint }: EmptyStateProps) {
+export default function EmptyState({ title, hint, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center px-4 py-10 text-center">
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent-soft-ink">
@@ -13,6 +15,7 @@ export default function EmptyState({ title, hint }: EmptyStateProps) {
       </span>
       <p className="mt-3 font-semibold text-ink">{title}</p>
       <p className="mt-1 text-sm text-ink-muted">{hint}</p>
+      {action && <div className="mt-4">{action}</div>}
     </div>
   )
 }
