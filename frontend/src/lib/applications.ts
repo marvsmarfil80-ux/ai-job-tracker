@@ -86,8 +86,3 @@ export function applicationStatusTone(status: string): Tone {
 export function canDelete(detail: ApplicationDetail): boolean {
   return detail.status === 'applied' && detail.events.length === 1
 }
-
-export function eventText(event: ApplicationEvent): string {
-  if (event.from_status === null) return 'Application created'
-  return `${applicationStatusLabel(event.from_status)} → ${applicationStatusLabel(event.to_status)}`
-}
