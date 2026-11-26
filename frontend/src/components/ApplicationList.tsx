@@ -7,6 +7,7 @@ import { sourceLabel } from '../lib/sources'
 import { formatDate } from '../lib/time'
 import StatusBadge from './StatusBadge'
 import EmptyState from './EmptyState'
+import SkeletonBlock from './SkeletonBlock'
 
 type ApplicationListProps = {
   items: ApplicationOut[]
@@ -14,6 +15,7 @@ type ApplicationListProps = {
   total: number
   selectedId: number | null
   disabled: boolean
+  refreshing: boolean
   filtersActive: boolean
   onSelect: (id: number) => void
   onPrevious: () => void
@@ -24,9 +26,38 @@ type ApplicationListProps = {
 const pagerButton =
   'inline-flex h-9 items-center gap-1 rounded-lg border border-control bg-surface px-3 text-sm font-medium text-ink enabled:hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50'
 
+const skeletonRows = [0, 1, 2, 3, 4]
+
 function initialFor(item: ApplicationOut): string {
   const basis = item.job.company?.trim() || item.job.title.trim()
   return basis.charAt(0).toUpperCase() || '?'
+}
+
+export function ApplicationListSkeleton() {
+  return (
+    <section
+      aria-hidden="true"
+      className="overflow-hidden rounded-card border border-line bg-surface shadow-card"
+    >
+      <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
+        <SkeletonBlock className="h-4 w-28" />
+        <SkeletonBlock className="h-3 w-20" />
+      </div>
+      <div className="divide-y divide-line">
+        {skeletonRows.map((row) => (
+          <div key={row} className="flex items-center gap-3 border-l-2 border-transparent px-5 py-4">
+            <SkeletonBlock className="h-9 w-9 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <SkeletonBlock className="h-4 w-3/4" />
+              <SkeletonBlock className="h-3 w-1/2" />
+              <SkeletonBlock className="h-3 w-1/3" />
+            </div>
+            <SkeletonBlock className="h-5 w-20 shrink-0" />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 export default function ApplicationList({
@@ -35,6 +66,7 @@ export default function ApplicationList({
   total,
   selectedId,
   disabled,
+  refreshing,
   filtersActive,
   onSelect,
   onPrevious,
@@ -85,7 +117,11 @@ export default function ApplicationList({
       {items.length === 0 ? (
         renderEmpty()
       ) : (
-        <ul aria-label="Applications" className="divide-y divide-line">
+        <ul
+          aria-label="Applications"
+          aria-busy={refreshing}
+          className={`divide-y divide-line transition-opacity duration-150 ${refreshing ? 'opacity-60' : ''}`}
+        >
           {items.map((item) => {
             const selected = item.id === selectedId
             return (

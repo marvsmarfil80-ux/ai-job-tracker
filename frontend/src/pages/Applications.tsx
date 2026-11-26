@@ -6,8 +6,8 @@ import PageHeader from '../components/PageHeader'
 import ErrorState from '../components/ErrorState'
 import ApplicationsFilterBar from '../components/ApplicationsFilterBar'
 import type { ApplicationFilters } from '../components/ApplicationsFilterBar'
-import ApplicationList from '../components/ApplicationList'
-import ApplicationDetailPanel from '../components/ApplicationDetailPanel'
+import ApplicationList, { ApplicationListSkeleton } from '../components/ApplicationList'
+import ApplicationDetailPanel, { ApplicationDetailSkeleton } from '../components/ApplicationDetailPanel'
 import type { DetailBusy } from '../components/ApplicationDetailPanel'
 import type {
   ApplicationChanges,
@@ -168,6 +168,18 @@ export default function Applications() {
   const filtersActive = search !== '' || status !== ''
   const activeFilterCount = (filters.search.trim() !== '' ? 1 : 0) + (status !== '' ? 1 : 0)
   const busyActive = busy !== null
+  const listStatus: 'skeleton' | 'refreshing' | 'ready' =
+    loaded !== null && loaded.requestKey === requestKey
+      ? 'ready'
+      : loaded !== null && loaded.viewKey === viewKey
+        ? 'refreshing'
+        : 'skeleton'
+  const loadingText =
+    listError === null && listStatus !== 'ready'
+      ? 'Loading applications.'
+      : selectedId !== null && detailErrorMessage === null && selectedDetail === null
+        ? 'Loading application.'
+        : ''
 
   function handleFiltersChange(next: ApplicationFilters) {
     const changed = next.status !== filters.status
@@ -279,12 +291,8 @@ export default function Applications() {
         </section>
       )
     }
-    if (loaded === null) {
-      return (
-        <section className={`${cardClass} px-5 py-10 text-center text-sm text-ink-muted`}>
-          Loading applications...
-        </section>
-      )
+    if (listStatus === 'skeleton') {
+      return <ApplicationListSkeleton />
     }
     return (
       <ApplicationList
@@ -292,7 +300,8 @@ export default function Applications() {
         offset={offset}
         total={total}
         selectedId={selectedId}
-        disabled={busyActive}
+        disabled={busyActive || listStatus !== 'ready'}
+        refreshing={listStatus === 'refreshing'}
         filtersActive={filtersActive}
         onSelect={handleSelect}
         onPrevious={handlePrevious}
@@ -326,11 +335,7 @@ export default function Applications() {
       )
     }
     if (selectedDetail === null) {
-      return (
-        <section className={`${cardClass} px-5 py-10 text-center text-sm text-ink-muted`}>
-          Loading application...
-        </section>
-      )
+      return <ApplicationDetailSkeleton />
     }
     return (
       <ApplicationDetailPanel
@@ -375,6 +380,10 @@ export default function Applications() {
           <ApplicationsFilterBar filters={filters} onChange={handleFiltersChange} onClear={handleClear} />
         </div>
       )}
+
+      <p role="status" className="sr-only">
+        {loadingText}
+      </p>
 
       {notice !== null && (
         <p

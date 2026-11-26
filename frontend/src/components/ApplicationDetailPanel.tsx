@@ -13,6 +13,7 @@ import { formatDateTime } from '../lib/time'
 import StatusBadge from './StatusBadge'
 import EmptyState from './EmptyState'
 import StatusMenu from './StatusMenu'
+import SkeletonBlock from './SkeletonBlock'
 
 export type DetailBusy = 'status' | 'notes' | 'delete'
 
@@ -300,4 +301,25 @@ export default function ApplicationDetailPanel(props: ApplicationDetailPanelProp
     )
   }
   return <DetailBody {...props} detail={props.detail} />
+}
+
+export function ApplicationDetailSkeleton() {
+  return (
+    <section aria-hidden="true" className="rounded-card border border-line bg-surface p-6 shadow-card">
+      <SkeletonBlock className="h-3 w-32" />
+      <SkeletonBlock className="mt-3 h-6 w-2/3" />
+      <SkeletonBlock className="mt-2 h-4 w-1/2" />
+      <div className="mt-5 flex items-center justify-between gap-4 border-y border-line py-4">
+        <SkeletonBlock className="h-4 w-24" />
+        <SkeletonBlock className="h-6 w-40" />
+      </div>
+      <SkeletonBlock className="mt-6 h-3 w-28" />
+      <div className="mt-3 space-y-3">
+        <SkeletonBlock className="h-10 w-full" />
+        <SkeletonBlock className="h-10 w-full" />
+      </div>
+      <SkeletonBlock className="mt-6 h-3 w-16" />
+      <SkeletonBlock className="mt-2 h-16 w-full" />
+    </section>
+  )
 }
