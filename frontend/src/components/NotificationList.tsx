@@ -1,6 +1,7 @@
-import { ArrowUpRight, CircleAlert, Clock, Info, Mail, Radar } from 'lucide-react'
+import { ArrowUpRight, Check, CircleAlert, CircleDot, Clock, Info, Mail, Radar } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import EmptyState from './EmptyState'
+import SkeletonBlock from './SkeletonBlock'
 import { formatDateTime } from '../lib/time'
 import {
   isKnownType,
@@ -32,12 +33,21 @@ const chipClasses: Record<NotificationTone, string> = {
 const secondaryButton =
   'min-h-9 cursor-pointer rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink transition-colors duration-150 hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50'
 
+const readButton =
+  'inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50'
+
+const markReadTone = 'text-accent-ink hover:bg-accent-soft hover:text-accent-soft-ink'
+
+const markUnreadTone = 'text-ink-muted hover:bg-sunken hover:text-ink'
+
 type NotificationListProps = {
   items: NotificationOut[]
   filter: NotificationFilter
   offset: number
   total: number
   disabled: boolean
+  refreshing: boolean
+  busyId: number | null
   onToggleRead: (id: number, isRead: boolean) => void
   onOpen: (item: NotificationOut) => void
   onShowAll: () => void
@@ -72,12 +82,34 @@ function RowContent({ item }: { item: NotificationOut }) {
   )
 }
 
+export function NotificationListSkeleton() {
+  return (
+    <section aria-hidden="true" className="overflow-hidden rounded-card border border-line bg-surface">
+      <ul>
+        {[0, 1, 2, 3].map((key) => (
+          <li key={key} className="flex items-center gap-4 border-b border-line px-6 py-4 last:border-b-0">
+            <SkeletonBlock className="h-9 w-9 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <SkeletonBlock className="h-4 w-32" />
+              <SkeletonBlock className="h-4 w-3/4" />
+              <SkeletonBlock className="h-3 w-24" />
+            </div>
+            <SkeletonBlock className="h-9 w-36 shrink-0" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default function NotificationList({
   items,
   filter,
   offset,
   total,
   disabled,
+  refreshing,
+  busyId,
   onToggleRead,
   onOpen,
   onShowAll,
@@ -86,7 +118,13 @@ export default function NotificationList({
 }: NotificationListProps) {
   if (total === 0) {
     return (
-      <section aria-label="Notifications list" className="rounded-card border border-line bg-surface">
+      <section
+        aria-label="Notifications list"
+        aria-busy={refreshing}
+        className={`rounded-card border border-line bg-surface transition-opacity duration-150 ${
+          refreshing ? 'opacity-60' : ''
+        }`}
+      >
         {filter === 'unread' ? (
           <EmptyState
             title="You're all caught up."
@@ -113,7 +151,10 @@ export default function NotificationList({
   return (
     <section
       aria-label="Notifications list"
-      className="overflow-hidden rounded-card border border-line bg-surface"
+      aria-busy={refreshing}
+      className={`overflow-hidden rounded-card border border-line bg-surface transition-opacity duration-150 ${
+        refreshing ? 'opacity-60' : ''
+      }`}
     >
       <ul>
         {items.map((item) => {
@@ -139,14 +180,26 @@ export default function NotificationList({
                   <RowContent item={item} />
                 </div>
               )}
-              <div className="flex w-32 shrink-0 justify-end">
+              <div className="flex w-36 shrink-0 justify-end">
                 <button
                   type="button"
                   onClick={() => onToggleRead(item.id, !item.is_read)}
                   disabled={disabled}
-                  className="min-h-9 cursor-pointer rounded-lg px-2 text-sm font-medium text-accent-ink hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`${readButton} ${item.is_read ? markUnreadTone : markReadTone}`}
                 >
-                  {item.is_read ? 'Mark unread' : 'Mark read'}
+                  {busyId === item.id ? (
+                    'Marking...'
+                  ) : item.is_read ? (
+                    <>
+                      <CircleDot size={15} aria-hidden="true" />
+                      Mark unread
+                    </>
+                  ) : (
+                    <>
+                      <Check size={15} aria-hidden="true" />
+                      Mark read
+                    </>
+                  )}
                 </button>
               </div>
             </li>
