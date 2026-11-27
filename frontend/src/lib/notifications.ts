@@ -1,3 +1,6 @@
+import { api } from './api'
+import { ApiError } from '../types'
+
 export type NotificationType =
   | 'hunt_done'
   | 'follow_up_overdue'
@@ -27,6 +30,10 @@ export type NotificationPage = {
 }
 
 export const NOTIFICATION_PAGE_SIZE = 25
+
+const MARK_ALL_BATCH = 200
+
+const MARK_ALL_ROUNDS = 10
 
 const labels: Record<NotificationType, string> = {
   hunt_done: 'Run finished',
@@ -69,4 +76,38 @@ export function routeForLink(link: string | null): string | null {
     if (link.startsWith(prefix)) return route
   }
   return null
+}
+
+export function fetchNotifications(
+  filter: NotificationFilter,
+  limit: number,
+  offset: number,
+): Promise<NotificationPage> {
+  return api.get<NotificationPage>('/notifications', {
+    unread: filter === 'unread' ? true : undefined,
+    limit,
+    offset,
+  })
+}
+
+export function setNotificationRead(id: number, isRead: boolean): Promise<NotificationOut> {
+  return api.patch<NotificationOut>(`/notifications/${id}`, { is_read: isRead })
+}
+
+export async function markAllNotificationsRead(): Promise<number> {
+  let marked = 0
+  for (let round = 0; round < MARK_ALL_ROUNDS; round += 1) {
+    const page = await fetchNotifications('unread', MARK_ALL_BATCH, 0)
+    if (page.items.length === 0) break
+    for (const item of page.items) {
+      try {
+        await setNotificationRead(item.id, true)
+        marked += 1
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) continue
+        throw error
+      }
+    }
+  }
+  return marked
 }

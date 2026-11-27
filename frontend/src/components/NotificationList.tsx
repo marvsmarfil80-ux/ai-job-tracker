@@ -37,6 +37,7 @@ type NotificationListProps = {
   filter: NotificationFilter
   offset: number
   total: number
+  disabled: boolean
   onToggleRead: (id: number, isRead: boolean) => void
   onOpen: (item: NotificationOut) => void
   onShowAll: () => void
@@ -76,6 +77,7 @@ export default function NotificationList({
   filter,
   offset,
   total,
+  disabled,
   onToggleRead,
   onOpen,
   onShowAll,
@@ -90,7 +92,7 @@ export default function NotificationList({
             title="You're all caught up."
             hint="There are no unread notifications."
             action={
-              <button type="button" onClick={onShowAll} className={secondaryButton}>
+              <button type="button" onClick={onShowAll} disabled={disabled} className={secondaryButton}>
                 Show all
               </button>
             }
@@ -127,7 +129,8 @@ export default function NotificationList({
                 <button
                   type="button"
                   onClick={() => onOpen(item)}
-                  className="flex min-w-0 flex-1 cursor-pointer items-start gap-4 rounded-lg text-left"
+                  disabled={disabled}
+                  className="flex min-w-0 flex-1 cursor-pointer items-start gap-4 rounded-lg text-left disabled:cursor-not-allowed"
                 >
                   <RowContent item={item} />
                 </button>
@@ -140,7 +143,8 @@ export default function NotificationList({
                 <button
                   type="button"
                   onClick={() => onToggleRead(item.id, !item.is_read)}
-                  className="min-h-9 cursor-pointer rounded-lg px-2 text-sm font-medium text-accent-ink hover:underline"
+                  disabled={disabled}
+                  className="min-h-9 cursor-pointer rounded-lg px-2 text-sm font-medium text-accent-ink hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {item.is_read ? 'Mark unread' : 'Mark read'}
                 </button>
@@ -154,10 +158,20 @@ export default function NotificationList({
           Showing {start}-{end} of {total}
         </p>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onPrevious} disabled={offset === 0} className={secondaryButton}>
+          <button
+            type="button"
+            onClick={onPrevious}
+            disabled={disabled || offset === 0}
+            className={secondaryButton}
+          >
             Previous
           </button>
-          <button type="button" onClick={onNext} disabled={end >= total} className={secondaryButton}>
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={disabled || end >= total}
+            className={secondaryButton}
+          >
             Next
           </button>
         </div>
