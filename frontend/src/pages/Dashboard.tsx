@@ -75,7 +75,7 @@ export default function Dashboard() {
       <div aria-busy="true">
         {header}
 
-        <div className="grid grid-cols-2 gap-4 min-[1050px]:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 min-[1050px]:grid-cols-4">
           {[0, 1, 2, 3].map((index) => (
             <div
               key={index}
@@ -92,11 +92,11 @@ export default function Dashboard() {
 
         <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
                 AI signal
               </p>
-              <div className="mt-1 flex items-baseline gap-2">
+              <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
                 <SkeletonBlock className="h-4 w-14" />
               </div>
@@ -104,7 +104,7 @@ export default function Dashboard() {
             </div>
             <Link
               to="/jobs"
-              className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
+              className="shrink-0 text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
             >
               View all
             </Link>
@@ -115,8 +115,8 @@ export default function Dashboard() {
               <div key={index} className="flex items-start gap-4 py-4">
                 <SkeletonBlock className="h-7 w-7 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <SkeletonBlock className="h-6 w-64" />
-                  <SkeletonBlock className="mt-1 h-5 w-48" />
+                  <SkeletonBlock className="h-6 w-full max-w-64" />
+                  <SkeletonBlock className="mt-1 h-5 w-full max-w-48" />
                   <SkeletonBlock className="mt-2 h-10 w-full" />
                 </div>
                 <SkeletonBlock className="h-7 w-10" />
@@ -146,7 +146,7 @@ export default function Dashboard() {
     <div>
       {header}
 
-      <div className="grid grid-cols-2 gap-4 min-[1050px]:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 min-[1050px]:grid-cols-4">
         <StatCard
           label="Total Applications"
           value={summary.total_applications}
@@ -174,11 +174,11 @@ export default function Dashboard() {
 
       <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-widest text-ink-subtle">
               AI signal
             </p>
-            <div className="mt-1 flex items-baseline gap-2">
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <h2 className="text-base font-semibold text-ink">AI Recommended Jobs</h2>
               <span className="text-sm text-ink-muted">{summary.recommended_jobs} total</span>
             </div>
@@ -186,7 +186,7 @@ export default function Dashboard() {
           </div>
           <Link
             to="/jobs"
-            className="text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
+            className="shrink-0 text-sm font-medium text-accent-ink underline-offset-4 hover:underline"
           >
             View all
           </Link>
