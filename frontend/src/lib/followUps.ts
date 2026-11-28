@@ -1,3 +1,6 @@
+import { api } from './api'
+import type { ApplicationList } from './applications'
+
 export type FollowUpStatus = 'pending' | 'completed'
 
 export type FollowUpFilter = FollowUpStatus
@@ -75,4 +78,37 @@ export function jobLabel(title: string, company: string | null): string {
 
 export function applicationLabel(application: FollowUpApplication): string {
   return jobLabel(application.job_title, application.job_company)
+}
+
+export function fetchFollowUps(status: FollowUpStatus, limit: number, offset: number): Promise<FollowUpList> {
+  return api.get<FollowUpList>('/follow-ups', { status, limit, offset })
+}
+
+export async function fetchFollowUpCounts(): Promise<FollowUpCounts> {
+  const [open, overdue, completed] = await Promise.all([
+    api.get<FollowUpList>('/follow-ups', { status: 'pending', limit: 1 }),
+    api.get<FollowUpList>('/follow-ups', { overdue: true, limit: 1 }),
+    api.get<FollowUpList>('/follow-ups', { status: 'completed', limit: 1 }),
+  ])
+  return { open: open.total, overdue: overdue.total, completed: completed.total }
+}
+
+export function createFollowUp(draft: FollowUpDraft): Promise<FollowUpOut> {
+  return api.post<FollowUpOut>('/follow-ups', draft)
+}
+
+export function updateFollowUp(id: number, changes: FollowUpChanges): Promise<FollowUpDetail> {
+  return api.patch<FollowUpDetail>(`/follow-ups/${id}`, changes)
+}
+
+export function deleteFollowUp(id: number): Promise<void> {
+  return api.delete<void>(`/follow-ups/${id}`)
+}
+
+export async function fetchApplicationOptions(): Promise<{ value: string; label: string }[]> {
+  const page = await api.get<ApplicationList>('/applications', { limit: 200 })
+  return page.items.map((application) => ({
+    value: String(application.id),
+    label: jobLabel(application.job.title, application.job.company),
+  }))
 }
