@@ -3,9 +3,13 @@ import { Radar } from 'lucide-react'
 import { navItems } from '../lib/nav'
 import ThemeToggle from './ThemeToggle'
 
-export default function Sidebar() {
+type SidebarProps = {
+  onNavigate?: () => void
+}
+
+export default function Sidebar({ onNavigate }: SidebarProps) {
   return (
-    <aside className="flex w-[242px] shrink-0 flex-col overflow-y-auto border-r border-line bg-chrome px-3.5 pb-4 pt-6">
+    <aside className="flex w-[242px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-line bg-chrome px-3.5 pb-4 pt-6">
       <div className="flex items-center gap-3 px-3 pb-6">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-600 text-white shadow-card">
           <Radar size={18} aria-hidden="true" />
@@ -23,6 +27,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex min-h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ${
                 isActive
