@@ -355,7 +355,7 @@ Endpoints:
 
 - `POST /applications` with body `{"job_id": 1, "applied_at": "<ISO 8601 with timezone>", "notes": "<text>"}`. Only `job_id` is required. The status is set to `applied` and the first history event is written. `applied_at` defaults to now and cannot be more than 1 day in the future. `notes` can have up to 2000 characters. A job in any pipeline status is accepted, except a dismissed job. A second application for the same job returns 409 with `existing_id`.
 - `GET /applications` supports `status`, `job_id`, `q` (searches job title and company), `limit` (default 50, maximum 200) and `offset`. The newest `applied_at` comes first. Each item includes a summary of its job.
-- `GET /applications/{id}` returns the application with its `events` (status history, oldest first).
+- `GET /applications/{id}` returns the application with its `events` (status history, oldest first). Each event includes `source` (`manual`, `email` or `undo`) and `email_id` (the linked email, or null).
 - `PATCH /applications/{id}` changes only `status` and `notes`. Any of the seven statuses can be set, because there are no transition rules yet. A status change writes a history event in the same transaction as the update. Setting the same status writes no event.
 - `DELETE /applications/{id}` is described below.
 
