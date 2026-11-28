@@ -169,3 +169,49 @@ def test_undo_after_a_new_email_change_only_works_for_the_latest(client, headers
     assert blocked.json()["detail"] == "The status has changed since this event"
     assert undo(client, headers, second_event).status_code == 200
     assert read_status(application_id) == "assessment"
+
+
+def event_by_id(data):
+    return {event["id"]: event for event in data["events"]}
+
+
+def test_detail_events_include_source_and_email_id(client, headers):
+    application_id = make_application("Example Corp", "applied")
+    email_id = make_email(status="processed")
+    email_event = add_event(application_id, "applied", "interview", "email", email_id)
+    manual_event = add_event(application_id, "interview", "offer", "manual")
+    response = client.get(f"/applications/{application_id}", headers=headers)
+    assert response.status_code == 200
+    events = event_by_id(response.json())
+    assert set(events) == {email_event, manual_event}
+    for event in events.values():
+        assert set(event) == {"id", "from_status", "to_status", "changed_at", "source", "email_id"}
+    assert events[email_event]["source"] == "email"
+    assert events[email_event]["email_id"] == email_id
+    assert events[manual_event]["source"] == "manual"
+    assert events[manual_event]["email_id"] is None
+
+
+def test_undo_response_includes_the_undo_event_source(client, headers):
+    application_id, email_id, event_id = email_change("applied", "interview")
+    response = undo(client, headers, event_id)
+    assert response.status_code == 200
+    events = event_by_id(response.json())
+    undo_event_id = read_undo_event_id(application_id)
+    assert set(events) == {event_id, undo_event_id}
+    assert events[event_id]["source"] == "email"
+    assert events[event_id]["email_id"] == email_id
+    assert events[undo_event_id]["source"] == "undo"
+    assert events[undo_event_id]["email_id"] == email_id
+
+
+def test_patch_status_writes_a_manual_event(client, headers):
+    application_id = make_application("Example Corp", "applied")
+    response = client.patch(
+        f"/applications/{application_id}", headers=headers, json={"status": "under_review"}
+    )
+    assert response.status_code == 200
+    events = response.json()["events"]
+    assert len(events) == 1
+    assert events[0]["source"] == "manual"
+    assert events[0]["email_id"] is None

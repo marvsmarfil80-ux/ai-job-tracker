@@ -68,6 +68,8 @@ class ApplicationEventOut(BaseModel):
     from_status: str | None
     to_status: str
     changed_at: datetime
+    source: Literal["manual", "email", "undo"]
+    email_id: int | None
 
 
 class ApplicationOut(BaseModel):
